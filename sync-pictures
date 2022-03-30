@@ -1,0 +1,12 @@
+#!/bin/bash
+
+host=$1
+if [ "$host" == "" ]; then
+    echo "usage: sync-pictures <to-host>"
+    echo "synopsis: copies everything in ~/pictures/ on the current host to <to-host>, deleting extraneous files on <to-host>"
+    exit 1
+fi
+
+ping -c1 $host >/dev/null || exit 1
+
+rsync -avz --delete --progress ~/pictures $host:~/

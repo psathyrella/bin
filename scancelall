@@ -1,0 +1,3 @@
+#!/bin/bash
+
+sacct|grep RUN|cut -f1 -d' '|xargs scancel

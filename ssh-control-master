@@ -1,0 +1,13 @@
+#!/bin/bash
+
+action="$1"
+
+if [ "$action" == "init" ]; then
+    ssh -nNf -o ControlMaster=yes -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" dralph@quoll
+elif [ "$action" == "print" ]; then
+    echo "rsync -e \"ssh -o 'ControlPath=$HOME/.ssh/ctl/%L-%r@%h:%p'\""
+elif [ "$action" == "exit" ]; then
+    ssh -O exit -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" dralph@quoll
+else
+    echo "unexpected action '$action' choose from 'init' 'print' 'exit'"
+fi

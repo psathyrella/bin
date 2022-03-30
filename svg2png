@@ -1,0 +1,11 @@
+#!/bin/bash
+
+if ! [ -f "$1" ]; then
+    echo "arg 1 $1 d.n.e"
+    exit 1;
+fi
+
+svgfname=$1
+basename="${svgfname%.*}"
+
+inkscape -z -e $basename.png -w 1024 $svgfname
