@@ -1,0 +1,6 @@
+#!/bin/bash
+
+ps -eo pcpu,pmem,rss,vsize,cputime:12,stime:7,user,pid,args:100 --sort pmem,pcpu $*
+# -H
+# -udralph
+# -w100

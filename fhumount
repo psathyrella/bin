@@ -1,0 +1,2 @@
+#!/bin/bash
+fusermount -u /fh/fast/matsen_e

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+fhmount
+dropbox start 2>&1 |grep -v 'load fq extension' &

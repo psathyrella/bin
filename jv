@@ -1,0 +1,3 @@
+#!/bin/bash
+# cat $1 | json_pp | le  # used to do it this way, but it's barfing on python-written json files
+cat $1 | python -m json.tool | le

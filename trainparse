@@ -1,0 +1,87 @@
+#!/usr/bin/env python
+import sys
+import csv
+import os
+import datetime
+import calendar
+import colored_traceback.always
+import imp
+
+from tutils import parsetime
+
+base_path = '%s/Dropbox/hill/training' % os.getenv('HOME')
+
+# ----------------------------------------------------------------------------------------
+def trfname(year):
+    return '%s/%d/general.txt' % (base_path, year)
+
+# ----------------------------------------------------------------------------------------
+def parse_trfile(year):
+    # ----------------------------------------------------------------------------------------
+    def init_tfo(line):
+        tfo = {}
+        lstrs = line.split()
+        try:
+            day = int(lstrs[0])
+        except:
+            raise Exception('couldn\'t parse day from \'%s\'' % line)
+        month = lstrs[1].capitalize()
+        if month not in calendar.month_abbr:
+            raise Exception('couldn\'t parse month from \'%s\'' % line)
+        tfo['date'] = datetime.datetime(year=year, month=list(calendar.month_abbr).index(month), day=day)  # initialization time, I think (probably utc)
+        tfo['xo'] = lstrs[2]
+        return tfo
+    # ----------------------------------------------------------------------------------------
+    def add_to_tfo(tfo, line):
+        if tfo['date'].date() == datetime.datetime.today().date():  # skip today since it's probably not complete
+            return
+        assert line[:2] == '  '
+        lstrs = line.split()
+        activity = lstrs[0]
+        tfo[activity] = {}
+        if activity == 'work':
+            tfo[activity]['hours'] = parsetime(lstrs[1])
+            if tfo[activity]['hours'] is None:
+                print '    couldn\'t parse time for %s: \'%s\'' % (str(tfo['date']), line)
+        else:
+            tfo[activity]['line'] = line
+    # ----------------------------------------------------------------------------------------
+    trainfos = []
+    with open(trfname(year)) as tfile:
+        tfo = None
+        for line in tfile:
+            line = line.rstrip('\n')
+            if line[0] != ' ':  # new day
+                if tfo is not None and tfo['date'].date() != datetime.datetime.today().date():  # add the last day to <trainfos> (skip today since it's probably not complete)
+                    trainfos.append(tfo)
+                tfo = init_tfo(line)
+            else:
+                add_to_tfo(tfo, line)
+    return trainfos
+
+# ----------------------------------------------------------------------------------------
+def get_n_week_time(trainfos, actstr, n_weeks):
+    # prev_time = datetime.datetime.now() - datetime.timedelta(weeks=n_weeks)
+    dtnow = datetime.datetime.now() - datetime.timedelta(days=1)  # go back to yesterday, since presumably we haven't finished writing today yet
+    target_date = dtnow - datetime.timedelta(weeks=n_weeks)
+    n_nonzero_days, n_total_days, time_total, earliest_date = 0, 0, 0, None
+    for tfo in reversed(trainfos):
+        if tfo['date'] < target_date:
+            break
+        if earliest_date is None or tfo['date'] < earliest_date:
+            earliest_date = tfo['date']
+        n_total_days += 1
+        if actstr not in tfo:
+            continue
+        n_nonzero_days += 1
+        time_total += tfo[actstr]['hours']
+    if earliest_date > target_date:
+        print '  warning: earliest found date %s later than target date %s' % (str(earliest_date), str(target_date))
+    print '    %d hours of %s (%.1f per week) over %d days (%d non-zero) from %s %s to %s %s' % (time_total, actstr, time_total / n_weeks, n_total_days, n_nonzero_days, calendar.month_abbr[earliest_date.month], earliest_date.day, calendar.month_abbr[dtnow.month], dtnow.day)
+
+# ----------------------------------------------------------------------------------------
+trainfos = []
+for year in [2021, 2022]:  #datetime.datetime.now().year
+    trainfos += parse_trfile(year)  # NOTE assumes you have the years sequentially
+# get_time_per_week(trainfos, 'work')
+get_n_week_time(trainfos, 'work', 3)

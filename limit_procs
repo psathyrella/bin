@@ -1,0 +1,27 @@
+#!/bin/bash
+
+if ! [ $1 ]; then echo "ERROR no args"; exit 1; fi
+string=`echo $1 | sed 's/\(..............\).*/\1/'`
+
+if [ $2 ]; then
+    max_procs=$2
+else
+    nCpus=`cat /proc/cpuinfo | grep 'processor.*:' | tail -n1 | sed 's/[^0-9]*\([0-9][0-9]*\)/\1/'`
+    (( nCpus += 1)) # cpuinfo starts counting from zero
+    max_procs=$nCpus
+    if (( max_procs < 1 )); then max_procs=1; fi            # has to have at least one...
+    if (( max_procs > 2 )); then (( max_procs /= 2 )); fi   # be nice and only use half the cpus
+fi
+
+getNprocs() {
+    ps auxw | grep $USER | grep -v grep | grep -v limit_procs | grep $string | wc -l
+}
+nProcs=`getNprocs`
+
+# ps auxw | grep $USER | grep -v grep | grep -v limit_procs | grep $string
+while (( $nProcs > $max_procs )); do
+#while (( $nProcs > 999 )); do  # disable it completely
+    echo -n " $nProcs > $max_procs,"
+    sleep 1
+    nProcs=`getNprocs`
+done
