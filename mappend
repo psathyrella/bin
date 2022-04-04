@@ -9,35 +9,24 @@ import sys
 import csv
 import numpy
 import subprocess
-import copy
 from datetime import datetime, timedelta
-import calendar
+
+import tutils
 
 # mappend -1 --plot --start-date 2019-Jun-1
 parser = argparse.ArgumentParser()
 parser.add_argument('mlist', nargs='+', type=float)
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 parser.add_argument('--plot', action='store_true')
-parser.add_argument('--start-date', help='e.g. 2019-Jun-1')
+parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
-
-if args.start_date is not None:
-    # args.start_date = datetime.fromisoformat('2019-01-04')  # new in python 3.7, darn it
-    try:
-        args.start_date = datetime.strptime(args.start_date, '%Y-%b-%d')
-    except ValueError:
-        raise Exception('--start-date must be of form 2019-Jun-1')
-    if args.debug:
-        print args.start_date
-    # Thu May 21 22:03:29 PDT 2015
-args.half_window = timedelta(days=args.half_window)
+tutils.process_args(args)
 
 # dtime = datetime.strptime(datestr.strip(), '%a %b %d %H:%M:%S %Z %Y')  # for later plotting use
 
-tickday = 1
 # max_delta = timedelta(days=7)
 
 if not args.plot:
@@ -65,96 +54,5 @@ else:
             mfos['weights'].append(float(line['weight']))
             mfos['n_days'].append((dt - args.start_date).days)
 
-    # if args.start_date is None:
-    #     args.start_date = mfos['dates'][0]
-    end_date = None
-    if end_date is None:
-        end_date = mfos['dates'][-1]
-
-    mfos['float_avgs'] = []
-    last_dtime = None  # just for dbg
-    for idt, (dtime, wgt) in enumerate(zip(mfos['dates'], mfos['weights'])):
-        wgtlist, dtlist = [], []  # <dtlist> is just for dbg
-
-        # first go backward in time til you've gone outside the window
-        itmp = idt
-        while True:
-            wgtlist.append(mfos['weights'][itmp])
-            dtlist.append(mfos['dates'][itmp])
-            itmp -= 1
-            if itmp < 0 or (dtime - mfos['dates'][itmp]) > args.half_window:
-                break
-
-        # then do the same thing forward
-        itmp = idt + 1
-        while True:
-            if itmp >= len(mfos['dates']) or (mfos['dates'][itmp] - dtime) > args.half_window:
-                break
-            wgtlist.append(mfos['weights'][itmp])
-            dtlist.append(mfos['dates'][itmp])
-            itmp += 1
-
-        mfos['float_avgs'].append(numpy.mean(wgtlist))
-        # ----------------------------------------------------------------------------------------
-        def dfcn(attr):
-            if last_dtime is None or getattr(dtime, attr) != getattr(last_dtime, attr):
-                return str(getattr(dtime, attr))
-            else:
-                return ''
-        # ----------------------------------------------------------------------------------------
-        def dstr(tmpdt):
-            tmp_ddays = (tmpdt - dtime).total_seconds()/(24.*60*60)
-            # return ('%.'+str(2 if tmp_ddays < 1 else 0)+'f') % tmp_ddays
-            return '%.1f' % tmp_ddays
-        # ----------------------------------------------------------------------------------------
-        if args.debug:
-            print '    %4s %3s %3s     %-18s   %s' % (dfcn('year'), dfcn('month'), dfcn('day'), ' '.join(str(dt.day) for dt in sorted(dtlist)), ' '.join(dstr(dt) for dt in sorted(dtlist)))
-        last_dtime = dtime
-
-    xticks, xticklabels = [], []
-    tmp_date = copy.deepcopy(args.start_date)
-    tickmonths = list(range(1, 13)) if (end_date - args.start_date) < timedelta(days=500) else list(range(1, 13, 2))
-    while tmp_date < end_date:
-        if tmp_date.day == tickday and tmp_date.month in tickmonths:
-            xticks.append((tmp_date - args.start_date).days)
-            xtl = '%s %d' % (calendar.month_abbr[tmp_date.month], tickday)
-            if tmp_date.month == 1:
-                xtl = '%d %s' % (tmp_date.year, xtl)
-            xticklabels.append(xtl)
-        tmp_date += timedelta(days=1)
-    # for dates, weights in mfos.values():
-
-
-    # ----------------------------------------------------------------------------------------
-    import matplotlib as mpl
-    mpl.use('Agg')
-    mpl.rcParams['svg.fonttype'] = 'none'
-    import matplotlib.pyplot as plt
-    import seaborn
-    seaborn.set_style('ticks')
-    fsize = 20
-    mpl.rcParams.update({
-        # 'legend.fontweight': 900,
-        'legend.fontsize': fsize,
-        'axes.titlesize': fsize,
-        # 'axes.labelsize': fsize,
-        'xtick.labelsize': fsize,
-        'ytick.labelsize': fsize,
-        'axes.labelsize': fsize
-    })
-
-
-    dpi = 80
-    xpixels, ypixels = 2500, 500
-    fig, ax = plt.subplots(figsize=(xpixels / dpi, ypixels / dpi))
-    fig.tight_layout()
-    plt.gcf().subplots_adjust(bottom=0.27, left=0.2, right=0.78, top=0.92)
-
-    ax.plot(mfos['n_days'], mfos['weights'], linewidth=0, alpha=0.7, markersize=15, marker='.')
-    ax.plot(mfos['n_days'], mfos['float_avgs'], linewidth=3, alpha=0.7)
-
-    plt.xticks(xticks)
-    ax.grid(axis='y')
-    ax.tick_params(labelright=True)
-    ax.set_xticklabels(xticklabels, rotation='vertical')
-    plt.savefig(args.plotfile)
+    tutils.add_float_averages(mfos, 'weights', args.half_window, debug=args.debug)
+    tutils.plot_mfos(args, mfos, 'weights')
