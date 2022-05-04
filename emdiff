@@ -1,0 +1,9 @@
+#!/bin/bash
+
+if ! [ -f "$1" ] || ! [ -f "$2" ]; then
+    echo "input files \"$1\" or \"$2\" don\'t both exist"
+    exit 1
+fi
+
+diff -ub $1 $2 >/tmp/d.dif
+emacs -nw /tmp/d.dif

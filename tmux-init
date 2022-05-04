@@ -1,0 +1,23 @@
+#!/bin/bash
+
+sname=partis
+sdir=$HOME/work/partis
+
+if tmux has-session -t $sname; then
+    echo "session $sname already already exists"
+    exit 0
+fi
+
+tmux new-session -d -c $sdir -s $sname -n emacs
+tmux send-keys -t $sname:emacs "emacs `cat ~/Dropbox/bin/partis-files.txt`" Enter
+tmux new-window -t $sname -c $sdir -n shell
+tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
+# tmux send-keys -t $sname:shell "history -w" Enter
+tmux send-keys -t $sname:shell "export pies=\"python/*.py bin/*.py test/*.py\"" Enter
+tmux send-keys -t $sname:shell "git checkout main && git merge dev && git checkout dev && git push origin main" Enter
+tmux send-keys -t $sname:shell "#grep -rn \".\" pies" Enter
+tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
+tmux new-window -t $sname -c $sdir -ns0
+tmux new-window -t $sname -c $sdir -ns1
+tmux new-window -t $sname -c $sdir -ns2
+tmux attach -t $sname:emacs
