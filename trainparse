@@ -89,13 +89,19 @@ def plot_acty(actstr):
         elif args.start_date > tfo['date']:
             continue
         mfos['dates'].append(tfo['date'])
-        mfos['hours'].append(float(tfo.get(actstr, {'hours' : 0})['hours']))
+        hour_str = tfo.get(actstr, {'hours' : 0})['hours']
+        if hour_str is None:
+            raise Exception('None type hour str for %s' % tfo['date'])
+        mfos['hours'].append(float(hour_str))
         mfos['n_days'].append((tfo['date'] - args.start_date).days)
     tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
     tutils.plot_mfos(args, mfos, 'hours')
 
 # ----------------------------------------------------------------------------------------
-parser = argparse.ArgumentParser()
+helpstr="""
+trainparse --debug --start-date 2021-Apr-15 --half-window 7
+"""
+parser = argparse.ArgumentParser(description=helpstr)
 # parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
