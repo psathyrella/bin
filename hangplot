@@ -24,13 +24,15 @@ min_weight_increment = 5  # minimum weight increment between sets/workouts
 parser = argparse.ArgumentParser()
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--start-date')
-parser.add_argument('--years', default=[2019, 2020]) #2018, 2019, 2020])
-parser.add_argument('--plot-grips', default='full-crimp')
+parser.add_argument('--years', default='2019:2020:2022') #2018, 2019, 2020])
+parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:thin-pinch:IM')
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
-parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png')
+parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))
 parser.add_argument('--half-window', type=float, default=2.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
+
+args.years = args.years.split(':')
 
 args.plot_grips = args.plot_grips.replace('-', ' ').split(':')
 
@@ -147,7 +149,7 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
 
         # actual grip line
         if cfgfo is None:
-            raise Exception('didn\'t read config info from file (line starting with \'config:\')')
+            raise Exception('didn\'t read config info from %s (line starting with \'config:\')' % hfname)
         lstrs = line.strip().split()
         grip = lstrs.pop(0)
         if grip not in all_grips:
@@ -244,6 +246,123 @@ mpl.rcParams.update({
 })
 
 # ----------------------------------------------------------------------------------------
+def plot_single_grip(gripname):
+    # ----------------------------------------------------------------------------------------
+    def plot_set(set_key, vbar=True):
+        for n_days_list, lw_list, sf_list in zip(mfos['sessions'], mfos[set_key + '-weights'], mfos[set_key + '-send-fractions']):
+            ax.plot(n_days_list, lw_list, linewidth=3, alpha=0.7, markersize=15, marker='.', color='grey')
+            if vbar:
+                for nd, lw, sf in zip(n_days_list, lw_list, sf_list):
+                    if sf == 0:  # unknown (should change this)
+                        ax.text(nd - 0.25, lw + 0.25 * min_weight_increment, '?')
+                    else:
+                        vw = 8
+                        ax.vlines(nd, lw, lw + sf * min_weight_increment, color='green', alpha=0.5, linewidth=vw)
+                        ax.vlines(nd, lw + sf * min_weight_increment, lw + min_weight_increment, color='red', alpha=0.75, linewidth=vw)
+                    if sf == 1:
+                        ax.hlines(lw + sf * min_weight_increment, nd - 0.25, nd + 0.25, color='green', linewidth=3)
+
+    # ----------------------------------------------------------------------------------------
+    mfos = {
+        # 'n-days' : [],
+        'sessions' : [],
+        'last-weights' : [],
+        'last-but-one-weights' : [],
+        'last-send-fractions' : [],
+        'last-but-one-send-fractions' : [],
+    }
+    isession = 0
+    xticks, xticklabels = [], []
+    for workouts in hangfos:
+        for hfo in workouts:
+            if gripname not in hfo['grips']:
+                continue
+            if hfo['session'] == 1:
+                for tk in mfos:
+                    mfos[tk].append([])
+
+            # x values
+            # if start_date is None:
+            #     start_date = hfo['date']
+            # mfos['n-days'][-1].append((hfo['date'] - start_date).days)
+            if len(mfos['sessions']) == 0:
+                continue
+            mfos['sessions'][-1].append(isession)
+            xval = isession
+            isession += 1
+
+            if hfo['session'] == 1:
+                xticks.append(xval)
+                xticklabels.append('%d %s \'%d' % (hfo['date'].day, calendar.month_abbr[hfo['date'].month], hfo['date'].year - 2000))
+
+            gfo = hfo['grips'][gripname]
+            # body_weight = hfo.get('weight', 0)
+            mfos['last-weights'][-1].append(gfo['added-weights'][-1])  # body_weight +
+            mfos['last-but-one-weights'][-1].append(gfo['added-weights'][-2])  # body_weight +
+
+            dbg = False #hfo['session'] == 8
+            total_times = [n * float(hfo['cfg']['work_time']) for n in hfo['cfg']['n_reps']]
+            if gfo['sent'] == 'yes':
+                send_times = total_times
+            elif gfo['sent'] == 'unknown' or 'fail-set' not in gfo:
+                send_times = [0., 0.]  # TODO this should be unknown rather than 0
+            else:
+                if dbg:
+                    print gfo['fail-set'], gfo['fail-rep'], gfo['fail-second']
+                if len(gfo['added-weights']) != hfo['cfg']['n_sets']:
+                    raise Exception('need to account for grip lines with different number of sets')
+                assert gfo['fail-set'] > 0  # doesn't make sense
+                send_times = [0., 0.]
+                for set_number in range(1, gfo['fail-set'] + 1):  # use 1-indexing, since that's what i implicitly use in the text files
+                    if dbg:
+                        print set_number
+                    n_reps = hfo['cfg']['n_reps'][set_number - 1]
+                    for rep_number in range(1, n_reps + 1):  # use 1-indexing, since that's what i implicitly use in the text files
+                        if set_number == gfo['fail-set'] and rep_number == gfo['fail-rep']:
+                            send_times[set_number - 1] += gfo['fail-second']
+                            if dbg:
+                                print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
+                            break
+                        send_times[set_number - 1] += hfo['cfg']['work_time']
+                        if dbg:
+                            print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
+            mfos['last-but-one-send-fractions'][-1].append(send_times[0] / total_times[0])
+            mfos['last-send-fractions'][-1].append(send_times[1] / total_times[1])
+
+    # # ----------------------------------------------------------------------------------------
+    # tmp_date = copy.deepcopy(args.start_date)
+    # tickmonths = list(range(1, 13)) if (end_date - args.start_date) < timedelta(days=500) else list(range(1, 13, 2))
+    # while tmp_date < end_date:
+    #     if tmp_date.day == tickday and tmp_date.month in tickmonths:
+    #         xticks.append((tmp_date - args.start_date).days)
+    #         xtl = '%s %d' % (calendar.month_abbr[tmp_date.month], tickday)
+    #         if tmp_date.month == 1:
+    #             xtl = '%d %s' % (tmp_date.year, xtl)
+    #         xticklabels.append(xtl)
+    #     tmp_date += timedelta(days=1)
+    # # for dates, weights in mfos.values():
+
+    dpi = 80
+    xpixels, ypixels = 2500, 700
+    fig, ax = plt.subplots(figsize=(xpixels / dpi, ypixels / dpi))
+    fig.tight_layout()
+    plt.gcf().subplots_adjust(bottom=0.27, left=0.05, right=0.95, top=0.92)
+
+    # ----------------------------------------------------------------------------------------
+    plot_set('last')
+    plot_set('last-but-one')
+
+    plt.xticks(xticks)
+    plt.title(gripname, fontweight='bold', fontsize=20)
+    ax.grid(axis='y')
+    ax.tick_params(labelright=True)
+    ax.set_xticklabels(xticklabels, rotation='vertical')
+    if not os.path.exists(args.plotdir):
+        os.makedirs(args.plotdir)
+    plt.savefig('%s/%s.svg' % (args.plotdir, gripname.replace(' ', '-')))
+
+
+# ----------------------------------------------------------------------------------------
 tickday = 1
 # max_delta = timedelta(days=7)
 
@@ -252,114 +371,5 @@ start_date = None
 # if end_date is None:
 #     end_date = mfos['dates'][-1]
 
-assert len(args.plot_grips) == 1
-gripname = args.plot_grips[0]
-
-mfos = {
-    # 'n-days' : [],
-    'sessions' : [],
-    'last-weights' : [],
-    'last-but-one-weights' : [],
-    'last-send-fractions' : [],
-    'last-but-one-send-fractions' : [],
-}
-isession = 0
-xticks, xticklabels = [], []
-for workouts in hangfos:
-    for hfo in workouts:
-        if gripname not in hfo['grips']:
-            continue
-        if hfo['session'] == 1:
-            for tk in mfos:
-                mfos[tk].append([])
-
-        # x values
-        # if start_date is None:
-        #     start_date = hfo['date']
-        # mfos['n-days'][-1].append((hfo['date'] - start_date).days)
-        mfos['sessions'][-1].append(isession)
-        xval = isession
-        isession += 1
-
-        if hfo['session'] == 1:
-            xticks.append(xval)
-            xticklabels.append('%d %s \'%d' % (hfo['date'].day, calendar.month_abbr[hfo['date'].month], hfo['date'].year - 2000))
-
-        gfo = hfo['grips'][gripname]
-        # body_weight = hfo.get('weight', 0)
-        mfos['last-weights'][-1].append(gfo['added-weights'][-1])  # body_weight +
-        mfos['last-but-one-weights'][-1].append(gfo['added-weights'][-2])  # body_weight +
-
-        dbg = False #hfo['session'] == 8
-        total_times = [n * float(hfo['cfg']['work_time']) for n in hfo['cfg']['n_reps']]
-        if gfo['sent'] == 'yes':
-            send_times = total_times
-        elif gfo['sent'] == 'unknown' or 'fail-set' not in gfo:
-            send_times = [0., 0.]  # TODO this should be unknown rather than 0
-        else:
-            if dbg:
-                print gfo['fail-set'], gfo['fail-rep'], gfo['fail-second']
-            if len(gfo['added-weights']) != hfo['cfg']['n_sets']:
-                raise Exception('need to account for grip lines with different number of sets')
-            assert gfo['fail-set'] > 0  # doesn't make sense
-            send_times = [0., 0.]
-            for set_number in range(1, gfo['fail-set'] + 1):  # use 1-indexing, since that's what i implicitly use in the text files
-                if dbg:
-                    print set_number
-                n_reps = hfo['cfg']['n_reps'][set_number - 1]
-                for rep_number in range(1, n_reps + 1):  # use 1-indexing, since that's what i implicitly use in the text files
-                    if set_number == gfo['fail-set'] and rep_number == gfo['fail-rep']:
-                        send_times[set_number - 1] += gfo['fail-second']
-                        if dbg:
-                            print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
-                        break
-                    send_times[set_number - 1] += hfo['cfg']['work_time']
-                    if dbg:
-                        print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
-        mfos['last-but-one-send-fractions'][-1].append(send_times[0] / total_times[0])
-        mfos['last-send-fractions'][-1].append(send_times[1] / total_times[1])
-
-# # ----------------------------------------------------------------------------------------
-# tmp_date = copy.deepcopy(args.start_date)
-# tickmonths = list(range(1, 13)) if (end_date - args.start_date) < timedelta(days=500) else list(range(1, 13, 2))
-# while tmp_date < end_date:
-#     if tmp_date.day == tickday and tmp_date.month in tickmonths:
-#         xticks.append((tmp_date - args.start_date).days)
-#         xtl = '%s %d' % (calendar.month_abbr[tmp_date.month], tickday)
-#         if tmp_date.month == 1:
-#             xtl = '%d %s' % (tmp_date.year, xtl)
-#         xticklabels.append(xtl)
-#     tmp_date += timedelta(days=1)
-# # for dates, weights in mfos.values():
-
-dpi = 80
-xpixels, ypixels = 2500, 700
-fig, ax = plt.subplots(figsize=(xpixels / dpi, ypixels / dpi))
-fig.tight_layout()
-plt.gcf().subplots_adjust(bottom=0.27, left=0.05, right=0.95, top=0.92)
-
-# ----------------------------------------------------------------------------------------
-def plot_set(set_key, vbar=True):
-    for n_days_list, lw_list, sf_list in zip(mfos['sessions'], mfos[set_key + '-weights'], mfos[set_key + '-send-fractions']):
-        ax.plot(n_days_list, lw_list, linewidth=3, alpha=0.7, markersize=15, marker='.', color='grey')
-        if vbar:
-            for nd, lw, sf in zip(n_days_list, lw_list, sf_list):
-                if sf == 0:  # unknown (should change this)
-                    ax.text(nd - 0.25, lw + 0.25 * min_weight_increment, '?')
-                else:
-                    vw = 8
-                    ax.vlines(nd, lw, lw + sf * min_weight_increment, color='green', alpha=0.5, linewidth=vw)
-                    ax.vlines(nd, lw + sf * min_weight_increment, lw + min_weight_increment, color='red', alpha=0.75, linewidth=vw)
-                if sf == 1:
-                    ax.hlines(lw + sf * min_weight_increment, nd - 0.25, nd + 0.25, color='green', linewidth=3)
-
-# ----------------------------------------------------------------------------------------
-plot_set('last')
-plot_set('last-but-one')
-
-plt.xticks(xticks)
-plt.title(gripname, fontweight='bold', fontsize=20)
-ax.grid(axis='y')
-ax.tick_params(labelright=True)
-ax.set_xticklabels(xticklabels, rotation='vertical')
-plt.savefig(args.plotfile)
+for gname in args.plot_grips:
+    plot_single_grip(gname)
