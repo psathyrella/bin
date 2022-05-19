@@ -12,6 +12,9 @@ tmux new-session -d -c $sdir -s $sname -n emacs
 tmux send-keys -t $sname:emacs "emacs `cat ~/Dropbox/bin/partis-files.txt`" Enter
 tmux new-window -t $sname -c $sdir -n shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
+tmux send-keys -t $sname:shell "while :; do sleep 8h; history -a; done &" Enter
+# append to bash history: history -a
+# append contents of bash history file to this terminal's history list (NOTE -c clears this terminal's history without saving it anywhere, so you'd probably actually want to do this somewhat differently): history -c; history -r
 # tmux send-keys -t $sname:shell "history -w" Enter
 tmux send-keys -t $sname:shell "export pies=\"python/*.py bin/*.py test/*.py\"" Enter
 tmux send-keys -t $sname:shell "#git checkout main && git merge dev && git checkout dev && git push origin main" Enter
