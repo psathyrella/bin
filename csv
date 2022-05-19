@@ -21,6 +21,7 @@ with open(args.infname) as infile:
     reader = csv.DictReader(infile, delimiter=delimiter)
     columns_to_use = args.columns if len(args.columns) > 0 else reader.fieldnames
     if len(set(reader.fieldnames)) != len(reader.fieldnames):
+        print reader.fieldnames
         raise Exception('non-unique fieldnames, which won\'t work with csv.DictReader: %s' % [n for n in reader.fieldnames if reader.fieldnames.count(n) > 1])
     lvals, wstrs = [], [len(c) for c in columns_to_use]
     iline = 0

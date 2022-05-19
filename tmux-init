@@ -14,7 +14,7 @@ tmux new-window -t $sname -c $sdir -n shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 # tmux send-keys -t $sname:shell "history -w" Enter
 tmux send-keys -t $sname:shell "export pies=\"python/*.py bin/*.py test/*.py\"" Enter
-tmux send-keys -t $sname:shell "git checkout main && git merge dev && git checkout dev && git push origin main" Enter
+tmux send-keys -t $sname:shell "#git checkout main && git merge dev && git checkout dev && git push origin main" Enter
 tmux send-keys -t $sname:shell "#grep -rn \".\" pies" Enter
 tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
 tmux new-window -t $sname -c $sdir -ns0
