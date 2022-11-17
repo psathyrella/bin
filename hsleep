@@ -1,0 +1,7 @@
+#!/bin/bash
+
+while True; do
+    history -r
+    history -a
+    sleep 10s
+done
