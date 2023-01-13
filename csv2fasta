@@ -7,4 +7,6 @@ if ! [ $infile ] || ! [ -f $infile ]; then
 fi
 outfile=`echo $infile | sed 's/\.csv/.fa/'`
 
-grep -v unique $infile | cut -d, -f1,17 | column -t -s, | awk '{print ">",$1,"\n",$2}' | tr '\r' ' ' | sed 's/ //g' > $outfile
+# NOTE the commas add spaces, but why tf did i add spaces to just remove them in the last sed command?
+# NOTE also that the -f2,1 column selection is wrong atm
+grep -v unique $infile | cut -d, -f2,1 | column -t -s, | awk '{print ">",$1,"\n",$2}' | tr '\r' ' ' | sed 's/ //g' > $outfile

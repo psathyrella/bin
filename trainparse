@@ -22,6 +22,8 @@ def parse_trfile(year):
     def init_tfo(line):
         tfo = {}
         lstrs = line.split()
+        if len(lstrs) < 3:
+            raise Exception('lstrs bust be len at least 3 but got %d for %s' % (len(lstrs), line))
         try:
             day = int(lstrs[0])
         except:
@@ -36,7 +38,8 @@ def parse_trfile(year):
     def add_to_tfo(tfo, line):
         if tfo['date'].date() == datetime.today().date():  # skip today since it's probably not complete
             return
-        assert line[:2] == '  '
+        if line[:2] != '  ':
+            raise Exception('first two chars must be spaces but got \'%s\' in:\n%s' % (line[:2], line))
         lstrs = line.split()
         activity = lstrs[0]
         tfo[activity] = {}

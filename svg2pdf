@@ -9,4 +9,5 @@ svgfname=$1
 basename="${svgfname%.*}"
 
 # inkscape -z -e $basename.png -w 1024 $svgfname
-inkscape -z --export-filename $basename.png -w 1024 $svgfname
+inkscape -z --export-dpi 350 --export-pdf=$basename.pdf $svgfname
+# inkscape -z --export-filename $basename.png -w 1024 $svgfname
