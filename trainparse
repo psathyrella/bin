@@ -97,6 +97,8 @@ def plot_acty(actstr):
             raise Exception('None type hour str for %s' % tfo['date'])
         mfos['hours'].append(float(hour_str))
         mfos['n_days'].append((tfo['date'] - args.start_date).days)
+    if len(mfos['dates']) == 0:
+        raise Exception('no dates passing start date %s' % args.start_date)
     tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
     tutils.plot_mfos(args, mfos, 'hours')
 
@@ -115,7 +117,7 @@ args = parser.parse_args()
 tutils.process_args(args)
 
 trainfos = []
-for year in [2021, 2022]:  #datetime.now().year
+for year in [2021, 2022, 2023]:  #datetime.now().year
     trainfos += parse_trfile(year)  # NOTE assumes you have the years sequentially
 # get_time_per_week(trainfos, 'work')
 # get_n_week_time(trainfos, 'work', 3)
