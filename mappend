@@ -22,7 +22,7 @@ parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights (i.e. all weights closer than this many days to the day in question are included in the average for that day)')
-parser.add_argument('--prefix', type=float, default=170, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this, e.g. if mlist is "46 51" this goes to 174.6 175.1')
+parser.add_argument('--prefix', type=float, default=170, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this (if any are negative, they\'re shifted down to the next one). e.g. if mlist is "46 51" this goes to 174.6 175.1')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
@@ -56,7 +56,7 @@ def read_mfos():
 # ----------------------------------------------------------------------------------------
 if not args.plot and len(args.mlist) > 0:
     if all(int(m)==m and m<100 for m in args.mlist):
-        args.mlist = [args.prefix + m/10. for m in args.mlist]
+        args.mlist = [args.prefix + float(m/10. if m>0 else -10 - m/10) for m in args.mlist]
     meanval = numpy.mean(args.mlist)
     print 'mean of %d: %.1f' % (len(args.mlist), meanval)
     datestr = datetime.now().strftime('%a %b %d %H:%M:%S %Y') #  %Z (was before %Y)
