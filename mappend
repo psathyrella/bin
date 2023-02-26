@@ -56,7 +56,7 @@ def read_mfos():
 # ----------------------------------------------------------------------------------------
 if not args.plot and len(args.mlist) > 0:
     if all(int(m)==m and m<100 for m in args.mlist):
-        args.mlist = [args.prefix + float(m/10. if m>0 else -10 - m/10) for m in args.mlist]
+        args.mlist = [args.prefix + float(m/10. if m>=0 else -10 - m/10) for m in args.mlist]
     meanval = numpy.mean(args.mlist)
     print 'mean of %d: %.1f' % (len(args.mlist), meanval)
     datestr = datetime.now().strftime('%a %b %d %H:%M:%S %Y') #  %Z (was before %Y)

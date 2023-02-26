@@ -13,4 +13,5 @@ cmd += ' --infname'
 cmd += ' ' + ' '.join(clist)
 cmd += ' --debug 1 --only-smith-waterman --leave-default-germline'
 
+print cmd
 subprocess.check_call(cmd.split())
