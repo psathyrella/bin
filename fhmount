@@ -2,4 +2,4 @@
 
 # reconnection is causing out of control ssh processes on oubli, so whatever turn off for now
 # sshfs -o allow_other,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3 quokka:/fh/fast/matsen_e /fh/fast/matsen_e -C
-sshfs -o allow_other quokka:/fh/fast/matsen_e /fh/fast/matsen_e -C
+sshfs -o allow_other,default_permissions,uid=1000,gid=1000 quokka:/fh/fast/matsen_e /fh/fast/matsen_e -C

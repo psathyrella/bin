@@ -24,7 +24,7 @@ min_weight_increment = 5  # minimum weight increment between sets/workouts
 parser = argparse.ArgumentParser()
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--start-date')
-parser.add_argument('--years', default='2019:2020:2022') #2018, 2019, 2020])
+parser.add_argument('--years', default='2019:2020:2022:2023') #2018, 2019, 2020])
 parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:thin-pinch:IM')
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))

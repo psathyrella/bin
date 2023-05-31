@@ -1,2 +1,3 @@
 #!/bin/bash
-fusermount -u /fh/fast/matsen_e
+# add -z (lazy) if it's hanging
+fusermount -u $* /fh/fast/matsen_e

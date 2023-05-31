@@ -1,4 +1,6 @@
 #!/bin/bash
 
-fhmount
+if [ `hostname` == "loraxis" ]; then
+    fhmount
+fi
 dropbox start 2>&1 |grep -v 'load fq extension' &

@@ -85,6 +85,7 @@ def get_n_week_time(trainfos, actstr, n_weeks):
 
 # ----------------------------------------------------------------------------------------
 def plot_acty(actstr):
+    print '    plotting activity \'work\''
     mfos = {'dates' : [], 'hours' : [], 'n_days' : []}
     for tfo in trainfos:
         if args.start_date is None:
@@ -110,7 +111,7 @@ parser = argparse.ArgumentParser(description=helpstr)
 # parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
-parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png')
+parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png', help='output png file name')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()

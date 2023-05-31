@@ -1,4 +1,6 @@
 #!/bin/bash
+if [ `hostname` == "loraxis" ]; then
+    dropbox stop
+fi
 fhumount
-dropbox stop
 sudo systemctl hibernate
