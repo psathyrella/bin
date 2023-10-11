@@ -1,5 +1,5 @@
 #!/bin/bash
-if [ `hostname` == "loraxis" ]; then
+if [ `hostname` == "glorax" ]; then
     dropbox stop
 fi
 fhumount

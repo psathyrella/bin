@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ `hostname` == "loraxis" ]; then
+if [ `hostname` == "glorax" ]; then
     fhmount
+    dropbox start 2>&1 |grep -v 'load fq extension' &
 fi
-dropbox start 2>&1 |grep -v 'load fq extension' &

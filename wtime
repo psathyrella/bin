@@ -8,7 +8,11 @@ from tutils import parsetime
 # NOTE won't work for unless second one is 24 hr time
 debug = True
 
-tstr = ''.join(sys.argv[1:])
+# tstr = ''.join(sys.argv[1:])
+import subprocess
+wline = subprocess.check_output('grep work ~/Dropbox/hill/training/2023/general.txt | tail -n1', shell=True)
+assert wline.split()[0] == 'work'
+tstr = ' '.join(wline.split()[1:]).strip()
 tstr = tstr.strip('()')
 if ',' in tstr:
     assert tstr.count(',') == 1
