@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [ `hostname` == "glorax" ]; then
+    echo ~/fh/fast/matsen_e
+else
+    echo /fh/fast/matsen_e
+fi
