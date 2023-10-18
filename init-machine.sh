@@ -2,6 +2,7 @@
 
 # NOTE can't run this script as a whole in one go, the idea is you copy/paste bits
 
+# i don't think the pip stuff is right
 sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python2.7-dev python3-dev python3-pip python2.7-pip inkscape tmux
 
 ssh-keygen -t ed25519 -C "dkralph@gmail.com"
@@ -21,7 +22,7 @@ git clone git@github.com:psathyrella/emacs.d
 mv emacs.d .emacs.d
 
 # download emacs using firefox
-./configure --with-x-toolkit=no
+./configure --with-x-toolkit=no --with-tiff=ifavailable
 make
 make check  # slow af, and maybe pointless
 sudo make install

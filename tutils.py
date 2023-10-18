@@ -14,7 +14,7 @@ def process_args(args):
         except ValueError:
             raise Exception('--start-date must be of form 2019-Jun-1')
         if args.debug:
-            print args.start_date
+            print(args.start_date)
         # Thu May 21 22:03:29 PDT 2015
     args.half_window = timedelta(days=args.half_window)
 
@@ -30,11 +30,11 @@ def parsetime(instr, debug=False):
         returnval = hours + float(minutes) / 60
     except:
         elines = traceback.format_exception(*sys.exc_info())
-        print ''.join(10*' '+l for l in elines)
-        print '    couldn\'t parse time from \'%s\' (see previous lines)' % instr
+        print(''.join(10*' '+l for l in elines))
+        print('    couldn\'t parse time from \'%s\' (see previous lines)' % instr)
         returnval = None
     if debug:
-        print '  %s --> %s --> %.2f' % (instr, tstr, returnval)
+        print('  %s --> %s --> %.2f' % (instr, tstr, returnval))
     return returnval
 
 # ----------------------------------------------------------------------------------------
@@ -76,7 +76,7 @@ def add_float_averages(mfos, yvar, half_window, debug=False):
                 # return ('%.'+str(2 if tmp_ddays < 1 else 0)+'f') % tmp_ddays
                 return '%4.1f' % tmp_ddays
             # ----------------------------------------------------------------------------------------
-            print '    %4s %3s %3s     %-22s   %s' % (dfcn('year'), dfcn('month'), dfcn('day'), ' '.join('%2d'%dt.day for dt in sorted(dtlist)), ' '.join(dstr(dt) for dt in sorted(dtlist)))
+            print('    %4s %3s %3s     %-22s   %s' % (dfcn('year'), dfcn('month'), dfcn('day'), ' '.join('%2d'%dt.day for dt in sorted(dtlist)), ' '.join(dstr(dt) for dt in sorted(dtlist))))
         last_dtime = dtime
 
 # ----------------------------------------------------------------------------------------
