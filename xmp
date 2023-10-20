@@ -1,0 +1,6 @@
+#!/bin/bash
+
+cfgdir=.config/xmodmap
+cfgfn=$cfgdir/`hostname`.cfg
+
+xmodmap $cfgfn
