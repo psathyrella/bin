@@ -3,7 +3,7 @@
 # NOTE can't run this script as a whole in one go, the idea is you copy/paste bits
 
 # i don't think the pip stuff is right
-sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python2.7-dev python3-dev python3-pip python2.7-pip inkscape tmux units
+sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python2.7-dev python3-dev python3-pip python2.7-pip inkscape tmux units htop scrot scons texlive-full
 
 ssh-keygen -t ed25519 -C "dkralph@gmail.com"
 eval "$(ssh-agent -s)"

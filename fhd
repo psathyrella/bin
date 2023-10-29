@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ `hostname` == "glorax" ]; then
+if [ `hostname` == "glorax" ] || [ `hostname` == "oubli" ]; then
     echo ~/fh/fast/matsen_e
 else
     echo /fh/fast/matsen_e
