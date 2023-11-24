@@ -11,7 +11,7 @@ debug = True
 
 # tstr = ''.join(sys.argv[1:])
 import subprocess
-wline = subprocess.check_output('grep work ~/Dropbox/hill/training/%d/general.txt | tail -n1' % datetime.now().year, shell=True, universal_newlines=True)
+wline = subprocess.check_output('grep "^  work" ~/Dropbox/hill/training/%d/general.txt | tail -n1' % datetime.now().year, shell=True, universal_newlines=True)
 assert wline.split()[0] == 'work'
 tstr = ' '.join(wline.split()[1:]).strip()
 tstr = tstr.strip('()')
@@ -31,7 +31,7 @@ tstop = parsetime(stopstr, debug=debug)
 tminus = parsetime(minus_str, debug=debug)
 
 tot_time_float = tstop - tstart - tminus
-tot_time_colon = '%d:%02d' % (math.floor(tot_time_float), int(60 * (tot_time_float - math.floor(tot_time_float))))
+tot_time_colon = '%d:%02d' % (math.floor(tot_time_float), round(60 * (tot_time_float - math.floor(tot_time_float))))
 if debug:
     print('(%.2f - %.2f) - %.2f = %.2f --> %s' % (tstop, tstart, tminus, tot_time_float, tot_time_colon))
 print(tot_time_colon)

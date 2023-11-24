@@ -3,4 +3,5 @@
 cfgdir=~/.config/xmodmap
 cfgfn=$cfgdir/`hostname`.cfg
 
+echo "executing xmodmap $cfgfn on `date`"
 xmodmap $cfgfn
