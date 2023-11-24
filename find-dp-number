@@ -1,0 +1,3 @@
+#!/bin/bash
+
+xrandr|grep '^\(e*DP-[0-9]\) connected'|grep -v primary|ap 1
