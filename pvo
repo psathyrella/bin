@@ -11,5 +11,5 @@ if '--paired' in clist:
 else:
     cmd += ' --outfname'
 cmd += ' ' + ' '.join(clist)
-
+print(cmd)
 subprocess.check_call(cmd.split())
