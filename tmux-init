@@ -19,7 +19,7 @@ tmux send-keys -t $sname:shell ". hsleep &" Enter
 tmux send-keys -t $sname:shell "export pies=\"python/*.py bin/*.py test/*.py projects/*.py\"" Enter
 tmux send-keys -t $sname:shell "#git checkout main && git merge dev && git checkout dev && git push origin main" Enter
 tmux send-keys -t $sname:shell "#grep -rn \".\" pies" Enter
-tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
+# NOTE don't use this any more, use ~/Dropbox/bin/gd  old:   tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
 tmux new-window -t $sname -c $sdir -ns0
 tmux new-window -t $sname -c $sdir -ns1
 tmux new-window -t $sname -c $sdir -ns2
