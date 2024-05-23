@@ -1,5 +1,6 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import argparse
+import os
 import sys
 import csv
 csv.field_size_limit(sys.maxsize)  # make sure we can write very large csv fields
@@ -9,6 +10,7 @@ parser.add_argument('infname')
 parser.add_argument('-c', '--columns', default='')
 parser.add_argument('--lines', type=int)
 parser.add_argument('--tab', action='store_true')  # tab delimiter
+parser.add_argument('--outfname')
 args = parser.parse_args()
 if len(args.columns) > 0:
     args.columns = args.columns.split(':')
@@ -17,17 +19,39 @@ delimiter = ','
 if args.tab or '.tsv' in args.infname:
     delimiter = '\t'
 
+if args.outfname is not None:
+    if os.path.dirname(args.outfname) == '':
+        args.outfname = '%s/%s' % (os.getcwd(), args.outfname)
+    if not os.path.exists(os.path.dirname(args.outfname)):
+        os.makedirs(os.path.dirname(args.outfname))
+    ofile = open(args.outfname, 'w')
+    osfx = args.outfname.split('.')[-1]  # output suffix
+    assert osfx in ['csv', 'fa', 'fasta']
 with open(args.infname) as infile:
     reader = csv.DictReader([row for row in infile if row[0]!='#'], delimiter=delimiter)
     columns_to_use = args.columns if len(args.columns) > 0 else reader.fieldnames
     if len(set(reader.fieldnames)) != len(reader.fieldnames):
         raise Exception('non-unique fieldnames, which won\'t work with csv.DictReader: %s' % [n for n in reader.fieldnames if reader.fieldnames.count(n) > 1])
+    if args.outfname is not None:
+        if osfx == 'csv':
+            writer = csv.DictWriter(ofile, columns_to_use)
+            writer.writeheader()
+        if osfx in ['fa', 'fasta']:
+            print('  writing fasta with name column \'%s\' and seq column \'%s\'' % (columns_to_use[0], columns_to_use[1]))
     lvals, wstrs = [], [len(c) for c in columns_to_use]
     iline = 0
     for line in reader:
+        if args.outfname is not None:
+            if osfx == 'csv':
+                writer.writerow({c : line[c] for c in columns_to_use})
+            elif osfx in ['fa', 'fasta']:
+                ofile.write('>%s\n%s\n' % (line[columns_to_use[0]], line[columns_to_use[1]]))
+            continue
         vals = [line[col] for col in columns_to_use]
         lvals.append(vals)
         wstrs = [max(len('%s'%v), w) for v, w in zip(vals, wstrs)]
+    if args.outfname is not None:
+        sys.exit(0)
     wstrs = ['%'+str(w+2)+'s' for w in wstrs]
     for vals in lvals:
         val_strs = [(w % v) for v, w in zip(vals, wstrs)]
