@@ -1,6 +1,6 @@
 #!/bin/bash
 
-while True; do
+while true; do
     history -r
     history -a
     sleep 10s

@@ -39,8 +39,7 @@ with open(args.infname) as infile:
         if osfx in ['fa', 'fasta']:
             print('  writing fasta with name column \'%s\' and seq column \'%s\'' % (columns_to_use[0], columns_to_use[1]))
     lvals, wstrs = [], [len(c) for c in columns_to_use]
-    iline = 0
-    for line in reader:
+    for iline, line in enumerate(reader):
         if args.outfname is not None:
             if osfx == 'csv':
                 writer.writerow({c : line[c] for c in columns_to_use})
@@ -50,15 +49,16 @@ with open(args.infname) as infile:
         vals = [line[col] for col in columns_to_use]
         lvals.append(vals)
         wstrs = [max(len('%s'%v), w) for v, w in zip(vals, wstrs)]
+        if args.lines is not None and iline >= args.lines - 1:
+            break
     if args.outfname is not None:
         sys.exit(0)
     wstrs = ['%'+str(w+2)+'s' for w in wstrs]
-    for vals in lvals:
+    for iline, vals in enumerate(lvals):
         val_strs = [(w % v) for v, w in zip(vals, wstrs)]
 
         if iline == 0:  # print header
             print(''.join([(w % h) for h, w in zip(columns_to_use, wstrs)]))
         print(''.join(val_strs))
-        iline += 1
-        if args.lines is not None and iline >= args.lines:
+        if args.lines is not None and iline >= args.lines - 1:
             break
