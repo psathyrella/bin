@@ -11,7 +11,12 @@ else
     exit 1
 fi
 
-for SINK in $(pacmd list-sinks | grep 'index:' | cut -b12-)
-do
-    pactl set-sink-volume $SINK $VOLUME
-done
+if pactl &>/dev/null; then  # pre-24.04 uses pactl
+    for SINK in $(pacmd list-sinks | grep 'index:' | cut -b12-)
+    do
+        pactl set-sink-volume $SINK $VOLUME
+    done
+else  # 24.04 uses wpctl (-l 1.5 limits final value to 150%)
+    delta_str=`echo $VOLUME | sed 's/\([+-]\)\(.*\)/\2\1/'`  # move +/- from before to after value/percent sign
+    wpctl set-volume @DEFAULT_AUDIO_SINK@ $delta_str
+fi

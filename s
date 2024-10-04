@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -f Sconstruct ]; then
+if [ -f Sconstruct ] || [ -f SConstruct ]; then
     scons
 else
     pdflatex main
