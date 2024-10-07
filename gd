@@ -3,6 +3,18 @@
 odir=~/Dropbox/wips
 mkdir -p $odir
 
+gdir=$1
+if [ "$gdir" != "" ] && [ -d $gdir ]; then
+    if [ "$gdir" == "." ]; then
+        gdir=`basename $PWD`
+    else
+        cd $gdir
+    fi
+    echo "using git dir $gdir"
+    git diff >$odir/wip-$gdir.patch
+    exit 0
+fi
+
 cd ~/work/partis
 git diff >$odir/wip.patch
 
