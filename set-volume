@@ -11,7 +11,7 @@ else
     exit 1
 fi
 
-if pactl &>/dev/null; then  # pre-24.04 uses pactl
+if pactl -h &>/dev/null; then  # pre-24.04 uses pactl
     for SINK in $(pacmd list-sinks | grep 'index:' | cut -b12-)
     do
         pactl set-sink-volume $SINK $VOLUME
