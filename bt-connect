@@ -1,0 +1,7 @@
+#!/bin/bash
+
+# list devices: bluetoothctl devices
+
+action=$1
+echo -e "$action 18:95:52:D1:15:A4" | bluetoothctl
+

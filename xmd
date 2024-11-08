@@ -1,7 +1,13 @@
 #!/bin/bash
 
 cfgdir=~/.config/xmodmap
-cfgfn=$cfgdir/`hostname`.cfg
+
+cfgstr=$1
+if [ "$cfgstr" != "" ]; then
+    cfgfn=$cfgdir/`hostname`-$cfgstr.cfg
+else
+    cfgfn=$cfgdir/`hostname`.cfg
+fi
 
 echo "executing xmodmap $cfgfn on `date`"
 xmodmap $cfgfn
