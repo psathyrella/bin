@@ -7,15 +7,21 @@ import copy
 
 # ----------------------------------------------------------------------------------------
 def process_args(args):
-    if args.start_date is not None:
-        # args.start_date = datetime.fromisoformat('2019-01-04')  # new in python 3.7, darn it
+    # ----------------------------------------------------------------------------------------
+    def process_date(aname):
+        if getattr(args, aname) is None:
+            return
+        # getattr(args, aname) = datetime.fromisoformat('2019-01-04')  # new in python 3.7, darn it
         try:
-            args.start_date = datetime.strptime(args.start_date, '%Y-%b-%d')
+            setattr(args, aname, datetime.strptime(getattr(args, aname), '%Y-%b-%d'))
         except ValueError:
             raise Exception('--start-date must be of form 2019-Jun-1')
         if args.debug:
-            print(args.start_date)
+            print(getattr(args, aname))
         # Thu May 21 22:03:29 PDT 2015
+    # ----------------------------------------------------------------------------------------
+    for aname in ['start_date', 'stop_date']:
+        process_date(aname)
     args.half_window = timedelta(days=args.half_window)
 
 # ----------------------------------------------------------------------------------------

@@ -16,6 +16,7 @@ tmux send-keys -t $sname:emacs "emacs `cat ~/Dropbox/bin/partis-files.txt`" Ente
 tmux new-window -t $sname -c $sdir -n shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 tmux send-keys -t $sname:shell "export HISTFILESIZE=10000" Enter
+tmux send-keys -t $sname:shell "export HISTCONTROL=ignoredups" Enter
 tmux send-keys -t $sname:shell "export PROMPT_COMMAND=\"history -a\"" Enter
 # tmux send-keys -t $sname:shell ". hsleep &" Enter
 # append to bash history: history -a

@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # m=$1
 # echo "`date`,$m" >>Dropbox/hill/m.csv
@@ -20,9 +20,10 @@ parser.add_argument('mlist', nargs='*', type=float)
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
+parser.add_argument('--stop-date', help='see --start-date')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights (i.e. all weights closer than this many days to the day in question are included in the average for that day)')
-parser.add_argument('--prefix', type=float, default=170, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this (if any are negative, they\'re shifted down to the next one). e.g. if mlist is "46 51" this goes to 174.6 175.1')
+parser.add_argument('--prefix', type=float, default=180, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this (if any are negative, they\'re shifted down to the next one). e.g. if mlist is "46 51" this goes to 174.6 175.1')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
@@ -43,6 +44,8 @@ def read_mfos():
                 args.start_date = dt
             elif args.start_date > dt:
                 continue
+            if args.stop_date is not None and dt > args.stop_date:
+                break
             # if len(mfos['dates']) > 0 and mfos['dates'][-1] is not None and dt - mfos['dates'][-1] > max_delta:
             #     mfos['dates'].append(None)
             #     mfos['weights'].append(None)
