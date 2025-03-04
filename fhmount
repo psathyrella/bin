@@ -1,4 +1,11 @@
 #!/bin/bash
 
+# need to kill any existing sshfs processes, since they can cause e.g. firefox to hang if the internet connections is dodgy
+pps | grep sshfs | grep -v grep
+for pid in `pps | grep sshfs | grep -v grep | ap 8`; do
+    echo "killing running sshfs process $pid"
+    kill -9 $pid
+done
+
 # reconnection is causing out of control ssh processes on oubli, so whatever turn off for now: ,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3
 sshfs -o allow_other,default_permissions,uid=1000,gid=1000 quokka:/fh/fast/matsen_e `fhd` -C
