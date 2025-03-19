@@ -23,7 +23,7 @@ def parse_trfile(year):
         tfo = {}
         lstrs = line.split()
         if len(lstrs) < 3:
-            raise Exception('lstrs bust be len at least 3 but got %d for %s' % (len(lstrs), line))
+            raise Exception('lstrs must be len at least 3 but got %d for %s' % (len(lstrs), line))
         try:
             day = int(lstrs[0])
         except:
@@ -46,11 +46,12 @@ def parse_trfile(year):
         if activity == 'work':
             tfo[activity]['hours'] = tutils.parsetime(lstrs[1])
             if tfo[activity]['hours'] is None:
-                print '    couldn\'t parse time for %s: \'%s\'' % (str(tfo['date']), line)
+                print('    couldn\'t parse time for %s: \'%s\'' % (str(tfo['date']), line))
         else:
             tfo[activity]['line'] = line
     # ----------------------------------------------------------------------------------------
     trainfos = []
+    print('      parsing %s' % trfname(year))
     with open(trfname(year)) as tfile:
         tfo = None
         for line in tfile:
@@ -80,12 +81,12 @@ def get_n_week_time(trainfos, actstr, n_weeks):
         n_nonzero_days += 1
         time_total += tfo[actstr]['hours']
     if earliest_date > target_date:
-        print '  warning: earliest found date %s later than target date %s' % (str(earliest_date), str(target_date))
-    print '    %d hours of %s (%.1f per week) over %d days (%d non-zero) from %s %s to %s %s' % (time_total, actstr, time_total / n_weeks, n_total_days, n_nonzero_days, calendar.month_abbr[earliest_date.month], earliest_date.day, calendar.month_abbr[dtnow.month], dtnow.day)
+        print('  warning: earliest found date %s later than target date %s' % (str(earliest_date), str(target_date)))
+    print('    %d hours of %s (%.1f per week) over %d days (%d non-zero) from %s %s to %s %s' % (time_total, actstr, time_total / n_weeks, n_total_days, n_nonzero_days, calendar.month_abbr[earliest_date.month], earliest_date.day, calendar.month_abbr[dtnow.month], dtnow.day))
 
 # ----------------------------------------------------------------------------------------
 def plot_acty(actstr):
-    print '    plotting activity \'work\''
+    print('    plotting activity \'work\'')
     mfos = {'dates' : [], 'hours' : [], 'n_days' : []}
     for tfo in trainfos:
         if args.start_date is None:
@@ -111,14 +112,15 @@ parser = argparse.ArgumentParser(description=helpstr)
 # parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
-parser.add_argument('--plotfile', default=os.getenv('HOME') + '/tmp.png', help='output png file name')
+parser.add_argument('--stop-date', help='see --start-date')
+parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.png', help='output png file name')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
 
 trainfos = []
-for year in [2021, 2022, 2023]:  #datetime.now().year
+for year in range(2021, datetime.now().year+1):
     trainfos += parse_trfile(year)  # NOTE assumes you have the years sequentially
 # get_time_per_week(trainfos, 'work')
 # get_n_week_time(trainfos, 'work', 3)
