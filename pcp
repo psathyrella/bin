@@ -5,7 +5,7 @@ import subprocess
 
 # [thneed] partis/ > ./bin/partis cache-parameters --infname /fh/fast/matsen_e/data/qa013-10x-pre/processed-data/v3/qa013/input/split-loci/igh+igk/igh.fa --n-max-queries 10 --debug 1 --only-smith-waterman --leave-default-germline
 clist = sys.argv[1:]
-cmd = './bin/partis cache-parameters'
+cmd = 'partis cache-parameters'
 if '--paired' in clist:
     clist.remove('--paired')
     cmd += ' --paired-loci'

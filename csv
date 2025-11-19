@@ -9,7 +9,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('infname')
 parser.add_argument('-c', '--columns', default='')
 parser.add_argument('--lines', type=int)
-parser.add_argument('--tab', action='store_true')  # tab delimiter
+parser.add_argument('--tab', action='store_true')  # force tab delimiter
+parser.add_argument('--comma', action='store_true')  # force , delimiter
 parser.add_argument('--outfname')
 args = parser.parse_args()
 if len(args.columns) > 0:
@@ -18,6 +19,8 @@ if len(args.columns) > 0:
 delimiter = ','
 if args.tab or '.tsv' in args.infname:
     delimiter = '\t'
+if args.comma:
+    delimiter = ','
 
 if args.outfname is not None:
     if os.path.dirname(args.outfname) == '':

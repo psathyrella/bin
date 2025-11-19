@@ -4,6 +4,7 @@ import traceback
 from datetime import datetime, timedelta
 import calendar
 import copy
+import csv
 
 # ----------------------------------------------------------------------------------------
 def process_args(args):
@@ -136,3 +137,27 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1):
     ax.tick_params(labelright=True)
     ax.set_xticklabels(xticklabels, rotation='vertical')
     plt.savefig(args.plotfile)
+
+# ----------------------------------------------------------------------------------------
+def read_mfos(args):
+    mfos = {'dates' : [], 'weights' : [], 'n_days' : []}
+    with open(args.mfile) as csvfile:
+        reader = csv.DictReader(csvfile)
+        for line in reader:
+            dt = datetime.strptime(line['date'].strip(), '%a %b %d %H:%M:%S %Y') #  %Z (was before %Y)
+            # epoch = dt.utcfromtimestamp(0)
+            if args.start_date is None:
+                args.start_date = dt
+            elif args.start_date > dt:
+                continue
+            if args.stop_date is not None and dt > args.stop_date:
+                break
+            # if len(mfos['dates']) > 0 and mfos['dates'][-1] is not None and dt - mfos['dates'][-1] > max_delta:
+            #     mfos['dates'].append(None)
+            #     mfos['weights'].append(None)
+            #     mfos['n_days'].append(None)
+            mfos['dates'].append(dt)
+            mfos['weights'].append(float(line['weight']))
+            mfos['n_days'].append((dt - args.start_date).total_seconds() / 86400.)
+
+    return mfos

@@ -14,6 +14,8 @@ import re
 import colored_traceback.always
 import yaml
 
+import tutils
+
 # ----------------------------------------------------------------------------------------
 fail_cfg = ['fail-second', 'fail-rep', 'fail-set']
 all_grips = set(['half crimp', 'MR', 'MRP', 'thin pinch', 'full crimp', 'IM', 'IMR', 'RP', 'med pinch', 'wide pinch'])
@@ -24,17 +26,21 @@ min_weight_increment = 5  # minimum weight increment between sets/workouts
 parser = argparse.ArgumentParser()
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--start-date')
-parser.add_argument('--years', default='2019:2020:2022:2023') #2018, 2019, 2020])
+parser.add_argument('--years', default='2019:2020:2022:2023:2024:2025') #2018, 2019, 2020])
 parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:thin-pinch:IM')
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))
 parser.add_argument('--half-window', type=float, default=2.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
+parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
+parser.add_argument('--stop-date', help='see --start-date')
 args = parser.parse_args()
 
 args.years = args.years.split(':')
 
 args.plot_grips = args.plot_grips.replace('-', ' ').split(':')
+
+mfos = tutils.read_mfos(args)
 
 # if args.start_date is not None:
 #     # args.start_date = datetime.fromisoformat('2019-01-04')  # new in python 3.7, darn it
@@ -98,12 +104,12 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
                 else:  # try to figure out if it's weight... I should've added units
                     hfo['weight'] = float(lstr)
         if args.debug:
-            print '  %-s  %2d %s' % (color('red' if hfo['session']==1 else 'blue', 'hb %d' % hfo['session'], width=5, padside='right'), hfo['date'].day, color('red_bkg' if hfo['session']==1 else None, calendar.month_abbr[hfo['date'].month]))
+            print('  %-s  %2d %s %s' % (color('red' if hfo['session']==1 else 'blue', 'hb %d' % hfo['session'], width=5, padside='right'), hfo['date'].day, color('red_bkg' if hfo['session']==1 else None, calendar.month_abbr[hfo['date'].month]), year))
         return hfo
 
     # ----------------------------------------------------------------------------------------
     if args.debug:
-        print ' reading %s' % hfname
+        print(' reading %s' % hfname)
     cfgfo = None
     workouts = []
     with open(hfname) as hfile:
@@ -121,11 +127,11 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
 
         if line.find('config:') == 0:
             if cfgfo is not None:
-                print '    %s cfg info' % color('red', 'replacing')
-            cfgfo = yaml.load(line.lstrip('config: '))
+                print('    %s cfg info' % color('red', 'replacing'))
+            cfgfo = yaml.load(line.lstrip('config: '), Loader=yaml.CLoader)
             assert cfgfo['n_sets'] == len(cfgfo['n_reps'])
             if args.debug:
-                print '  config: %s' % cfgfo
+                print('  config: %s' % cfgfo)
             continue
         elif line[0] == '>':
             hfo = init_workout(line, cfgfo)
@@ -135,7 +141,7 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
                 workouts.append(hfo)
                 hfo = None
             if n_workouts is not None and len(workouts) >= n_workouts:
-                print '  breaking after %d workouts' % n_workouts
+                print('  breaking after %d workouts' % n_workouts)
                 break
             continue
         elif line.find('next') == 0:
@@ -144,7 +150,7 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
             while iline < len(hlines) - 1 and len(hlines[iline].strip()) > 0:  # skip this block (could probably break instead of continue, but i might forget and put some stuff after a 'next' at some point)
                 iline += 1
             if args.debug:
-                print '    skipped \'next:\' block with %d lines' % (iline - dbg_iline)
+                print('    skipped \'next:\' block with %d lines' % (iline - dbg_iline))
             continue
 
         # actual grip line
@@ -157,10 +163,11 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
         if grip not in all_grips:
             raise Exception('couldn\'t find grip in line \'%s\'' % line)
         gfo = {'grip' : grip, 'sent' : 'no'}
+# TODO fix this so you don't miss the >1 first workout if you skipped a grip
         if 'skipped' in lstrs:
             gfo['skipped'] = True
             if args.debug:
-                print '     %10s   %s' % (gfo['grip'], color('red', 'skipped'))
+                print('     %10s   %s' % (gfo['grip'], color('red', 'skipped')))
             continue
         gfo['added-weights'] = []
 
@@ -168,7 +175,11 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
         if 'N_SETS' in line:
             tmpsets = int([l for l in lstrs if 'N_SETS' in l][0].split(':')[1])
         for _ in range(tmpsets):
-            gfo['added-weights'].append(float(lstrs.pop(0)))
+            twgt = lstrs.pop(0)
+            if twgt == '-':
+# TODO this needs to be fixed (it needs to handle one-set grips)
+                twgt = '-99' #'nan'
+            gfo['added-weights'].append(float(twgt))
 
         if 'N_REPS' in line or 'WORK_TIME' in line or 'REST_TIME' in line:
             raise Exception('not yet implemented')
@@ -192,14 +203,14 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
             gfo['sent'] = 'unknown'  # i parse the note below, which can change this
         gfo['note'] = ' '.join(lstrs)
 
-        if gfo['sent'] is 'unknown' and any(e in gfo['note'] for e in extra_completion_strs):
+        if gfo['sent'] == 'unknown' and any(e in gfo['note'] for e in extra_completion_strs):
             gfo['sent'] = 'yes'
             if args.debug:
                 for estr in [e for e in extra_completion_strs if e in gfo['note']]:
                     gfo['note'] = gfo['note'].replace(estr, color('green', estr))
         if 'NEW_GRIP' in gfo['note']:
             if args.debug:
-                print '    %s changed %s grip (see note)' % (color('red', 'note'), gfo['grip'])
+                print('    %s changed %s grip (see note)' % (color('red', 'note'), gfo['grip']))
 
         hfo['grips'][gfo['grip']] = gfo
 
@@ -215,7 +226,7 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
                 if eclr != '':
                     vstr = color(eclr, vstr)
                 return vstr
-            print '     %10s    %s   %s   %s  %s' % (grip, ''.join(fstr(w, 'red' if len(gfo['added-weights']) != cfgfo['n_sets'] else '') for w in gfo['added-weights']), sentstr, ' '.join(str(gfo[f] if f in gfo else color('purple', '-')) for f in fail_cfg), gfo['note'])
+            print('     %10s    %s   %s   %s  %s' % (grip, ''.join(fstr(w, 'red' if len(gfo['added-weights']) != cfgfo['n_sets'] else '') for w in gfo['added-weights']), sentstr, ' '.join(str(gfo[f] if f in gfo else color('purple', '-')) for f in fail_cfg), gfo['note']))
 
     return workouts
 
@@ -308,24 +319,24 @@ def plot_single_grip(gripname):
                 send_times = [0., 0.]  # TODO this should be unknown rather than 0
             else:
                 if dbg:
-                    print gfo['fail-set'], gfo['fail-rep'], gfo['fail-second']
+                    print(gfo['fail-set'], gfo['fail-rep'], gfo['fail-second'])
                 if len(gfo['added-weights']) != hfo['cfg']['n_sets']:
                     raise Exception('need to account for grip lines with different number of sets')
                 assert gfo['fail-set'] > 0  # doesn't make sense
                 send_times = [0., 0.]
                 for set_number in range(1, gfo['fail-set'] + 1):  # use 1-indexing, since that's what i implicitly use in the text files
                     if dbg:
-                        print set_number
+                        print(set_number)
                     n_reps = hfo['cfg']['n_reps'][set_number - 1]
                     for rep_number in range(1, n_reps + 1):  # use 1-indexing, since that's what i implicitly use in the text files
                         if set_number == gfo['fail-set'] and rep_number == gfo['fail-rep']:
                             send_times[set_number - 1] += gfo['fail-second']
                             if dbg:
-                                print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
+                                print('   %2d  %.0f' % (rep_number, send_times[set_number - 1]))
                             break
                         send_times[set_number - 1] += hfo['cfg']['work_time']
                         if dbg:
-                            print '   %2d  %.0f' % (rep_number, send_times[set_number - 1])
+                            print('   %2d  %.0f' % (rep_number, send_times[set_number - 1]))
             mfos['last-but-one-send-fractions'][-1].append(send_times[0] / total_times[0])
             mfos['last-send-fractions'][-1].append(send_times[1] / total_times[1])
 

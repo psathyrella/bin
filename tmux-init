@@ -4,20 +4,32 @@ sname=$1
 if [ "$sname" == "" ]; then
     sname=partis
 fi
-sdir=$HOME/work/partis
-
 if tmux has-session -t $sname; then
     echo "session $sname already already exists"
     exit 0
 fi
 
+sdir=$2
+if [ "$sdir" == "" ]; then
+    sdir=$HOME/work/$sname
+    echo "sdir not set, so using $sdir"
+fi
+
+if [ ! -d "$sdir" ]; then
+    echo "creating directory $sdir"
+    mkdir -p "$sdir"
+fi
+
 tmux new-session -d -c $sdir -s $sname -n emacs
-tmux send-keys -t $sname:emacs "emacs `cat ~/Dropbox/bin/partis-files.txt`" Enter
+if [ "$sname" == "partis" ] || [ "$sname" == "gcdyn" ]; then
+    files="`cat ~/Dropbox/bin/$sname-files.txt`"
+fi
+tmux send-keys -t $sname:emacs "emacs $files" Enter
 tmux new-window -t $sname -c $sdir -n shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 tmux send-keys -t $sname:shell "export HISTFILESIZE=10000" Enter
 tmux send-keys -t $sname:shell "export HISTCONTROL=ignoredups" Enter
-tmux send-keys -t $sname:shell "export PROMPT_COMMAND=\"history -a\"" Enter
+tmux send-keys -t $sname:shell "export PROMPT_COMMAND=\"history -a\"" Enter  # this appends the current shell's history to HISTFILE, whereas 'history -r' appends HISTFILE contents to the current shell's history (i.e. run the latter when you start a new tmux session)
 # tmux send-keys -t $sname:shell ". hsleep &" Enter
 # append to bash history: history -a
 # append contents of bash history file to this terminal's history list (NOTE -c clears this terminal's history without saving it anywhere, so you'd probably actually want to do this somewhat differently): history -c; history -r

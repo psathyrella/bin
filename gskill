@@ -1,3 +1,0 @@
-#!/bin/bash
-
-pps|grep /usr/bin/gnome-shell|grep -v grep|ap 8|xargs sudo kill -9

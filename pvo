@@ -4,7 +4,7 @@ import os
 import subprocess
 
 clist = sys.argv[1:]
-cmd = './bin/partis view-output'
+cmd = 'partis view-output'
 if '--paired' in clist:
     clist.remove('--paired')
     cmd += ' --paired-loci --paired-outdir'

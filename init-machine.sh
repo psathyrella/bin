@@ -3,7 +3,19 @@
 # NOTE can't run this script as a whole in one go, the idea is you copy/paste bits
 
 # i don't think the pip stuff is right
-sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python2.7-dev python3-dev python3-pip python2.7-pip inkscape tmux units htop scrot scons texlive-full
+sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python3-dev python3-pip python3-build python3-wheel python-is-python3 inkscape tmux units htop scrot scons texlive-full latexmk curl mafft tesseract-ocr iotop npm colordiff
+sudo snap install marktext #glow
+# # ----------------------------------------------------------------------------------------
+# # Install essential linear algebra libraries
+# sudo apt update
+# sudo apt install libblas-dev liblapack-dev
+
+# # Install Boost development libraries
+# sudo apt install libboost-all-dev
+
+# # Optional: Install additional libraries for better performance
+# sudo apt install libeigen3-dev libsuitesparse-dev libfftw3-dev
+# # ----------------------------------------------------------------------------------------
 
 ssh-keygen -t ed25519 -C "dkralph@gmail.com"
 eval "$(ssh-agent -s)"
@@ -16,13 +28,13 @@ cat ~/.ssh/id_ed25519.pub
 git clone git@github.com:psathyrella/config
 cp -rTv config ~  # this is a little risky, e.g. it does overwrite some changes in bashrc which maybe I should keep some of
 
-xmodmap .xmodmap  # aaaaaah, yeah
+xmodmap .xmodmap  # aaaaaah, yeah  NOTE now I think should use xmd command from Dropbox/bin
 
 git clone git@github.com:psathyrella/emacs.d
 mv emacs.d .emacs.d
 
 # download emacs using firefox
-./configure --with-x-toolkit=no --with-tiff=ifavailable
+./configure --with-x-toolkit=no --with-tiff=ifavailable --with-jpeg=ifavailable --with-png=ifavailable
 make
 make check  # slow af, and maybe pointless
 sudo make install
@@ -56,4 +68,7 @@ gsettings set org.gnome.desktop.interface gtk-key-theme   "Emacs"
 
 # install magit (within emacs):
 package-install # then enter 'magit'
+
+# claude code
+npx @anthropic-ai/claude-code
 
