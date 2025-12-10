@@ -23,7 +23,8 @@ parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floatin
 parser.add_argument('--stop-date', help='see --start-date')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/m.jpg')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights (i.e. all weights closer than this many days to the day in question are included in the average for that day)')
-parser.add_argument('--prefix', type=float, default=170, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this (if any are negative, they\'re shifted down to the next one). e.g. if mlist is "46 51" this goes to 174.6 175.1')
+parser.add_argument('--prefix', type=float, help='if all entries in <mlist> are integers less than 100, treat them as shorthands for floats less than 10 to add to this (if any are negative, they\'re shifted down to the next one). e.g. if mlist is "46 51" this goes to 174.6 175.1')
+parser.add_argument('--base', type=float, default=180, help='if set, use a window of [-5, +5) around this value instead of --prefix. e.g. with --base 180, "89 03" becomes 178.9 180.3')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
@@ -35,9 +36,20 @@ tutils.process_args(args)
 # ----------------------------------------------------------------------------------------
 if not args.plot and len(args.mlist) > 0:
     if all(int(m)==m and m<100 for m in args.mlist):
-        args.mlist = [args.prefix + float(m/10. if m>=0 else -10 - m/10) for m in args.mlist]
+        if args.base is not None:
+            assert args.prefix is None  # can't set both
+            result = []
+            for m in args.mlist:
+                decimal = float(m / 10.)  # e.g. 89 -> 8.9, 03 -> 0.3
+                # find the tens offset that puts (tens*10 + decimal) in [base-5, base+5)
+                tens = round((args.base - decimal) / 10)  # if args.base - decimal has last digit greater than 5, it'll get rounded up
+                result.append(tens * 10 + decimal)
+            args.mlist = result
+        else:
+            assert args.base is None  # can't set both
+            args.mlist = [args.prefix + float(m/10. if m>=0 else -10 - m/10) for m in args.mlist]
     meanval = numpy.mean(args.mlist)
-    print('mean of %d: %.1f' % (len(args.mlist), meanval))
+    print('mean of %d (%s): %.1f' % (len(args.mlist), ' '.join('%.1f'%m for m in args.mlist), meanval))
     datestr = datetime.now().strftime('%a %b %d %H:%M:%S %Y') #  %Z (was before %Y)
     with open(args.mfile, 'a') as csvfile:
         csvfile.write('%s,%s,%.1f\n' % (datestr, ':'.join('%.1f'%m for m in args.mlist), meanval))

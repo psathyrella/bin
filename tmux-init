@@ -4,7 +4,7 @@ sname=$1
 if [ "$sname" == "" ]; then
     sname=partis
 fi
-if tmux has-session -t $sname; then
+if tmux has-session -t $sname &>/dev/null; then
     echo "session $sname already already exists"
     exit 0
 fi
@@ -20,12 +20,12 @@ if [ ! -d "$sdir" ]; then
     mkdir -p "$sdir"
 fi
 
-tmux new-session -d -c $sdir -s $sname -n emacs
-if [ "$sname" == "partis" ] || [ "$sname" == "gcdyn" ]; then
+tmux new-session -d -c $sdir -s $sname --name emacs
+if [ -f ~/Dropbox/bin/$sname-files.txt ]; then
     files="`cat ~/Dropbox/bin/$sname-files.txt`"
 fi
 tmux send-keys -t $sname:emacs "emacs $files" Enter
-tmux new-window -t $sname -c $sdir -n shell
+tmux new-window -t $sname -c $sdir --name shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 tmux send-keys -t $sname:shell "export HISTFILESIZE=10000" Enter
 tmux send-keys -t $sname:shell "export HISTCONTROL=ignoredups" Enter
@@ -38,7 +38,7 @@ tmux send-keys -t $sname:shell "export pies=\"python/*.py bin/*.py test/*.py pro
 tmux send-keys -t $sname:shell "#git checkout main && git merge dev && git checkout dev && git push origin main" Enter
 tmux send-keys -t $sname:shell "#grep -rn \".\" pies" Enter
 # NOTE don't use this any more, use ~/Dropbox/bin/gd  old:   tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
-tmux new-window -t $sname -c $sdir -ns0
-tmux new-window -t $sname -c $sdir -ns1
-tmux new-window -t $sname -c $sdir -ns2
+tmux new-window -t $sname -c $sdir --name s0
+tmux new-window -t $sname -c $sdir --name s1
+# tmux new-window -t $sname -c $sdir --name s2
 tmux attach -t $sname:emacs
