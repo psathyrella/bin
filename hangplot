@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import argparse
+from termcolor import colored
 import os
 import sys
 import csv
@@ -27,7 +28,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--start-date')
 parser.add_argument('--years', default='2019:2020:2022:2023:2024:2025') #2018, 2019, 2020])
-parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:thin-pinch:IM')
+parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:IM')  # :thin-pinch
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))
 parser.add_argument('--half-window', type=float, default=2.5, help='half width of window for averaging weights')
@@ -145,13 +146,9 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
                 break
             continue
         elif line.find('next') == 0:
-            dbg_iline = iline
-            iline += 1
-            while iline < len(hlines) - 1 and len(hlines[iline].strip()) > 0:  # skip this block (could probably break instead of continue, but i might forget and put some stuff after a 'next' at some point)
-                iline += 1
             if args.debug:
-                print('    skipped \'next:\' block with %d lines' % (iline - dbg_iline))
-            continue
+                print('    stopping at \'next:\' block (ignoring %d remaining lines)' % (len(hlines) - iline - 1))
+            break
 
         # actual grip line
         if cfgfo is None:
@@ -174,12 +171,15 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
         tmpsets = cfgfo['n_sets']
         if 'N_SETS' in line:
             tmpsets = int([l for l in lstrs if 'N_SETS' in l][0].split(':')[1])
-        for _ in range(tmpsets):
+        for iset in range(tmpsets):
+            if len(lstrs) == 0:
+                print('  %s not enough weights in %s at line %d (expected %d sets, got %d -- put a dash for any skipped sets):\n  %s' % (colored('error', 'red'), hfname, iline + 1, tmpsets, iset, line.rstrip()))
+                break
             twgt = lstrs.pop(0)
             if twgt == '-':
-# TODO this needs to be fixed (it needs to handle one-set grips)
-                twgt = '-99' #'nan'
-            gfo['added-weights'].append(float(twgt))
+                gfo['added-weights'].append(numpy.nan)
+            else:
+                gfo['added-weights'].append(float(twgt))
 
         if 'N_REPS' in line or 'WORK_TIME' in line or 'REST_TIME' in line:
             raise Exception('not yet implemented')
@@ -212,6 +212,8 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
             if args.debug:
                 print('    %s changed %s grip (see note)' % (color('red', 'note'), gfo['grip']))
 
+        if hfo is None:
+            raise Exception('grip line found but no workout initialized in %s at line %d:\n  %s' % (hfname, iline + 1, line.rstrip()))
         hfo['grips'][gfo['grip']] = gfo
 
         if args.debug:
@@ -228,6 +230,8 @@ def read_hfo(hfname, year, n_workouts=None):  # n_workouts: stop after reading t
                 return vstr
             print('     %10s    %s   %s   %s  %s' % (grip, ''.join(fstr(w, 'red' if len(gfo['added-weights']) != cfgfo['n_sets'] else '') for w in gfo['added-weights']), sentstr, ' '.join(str(gfo[f] if f in gfo else color('purple', '-')) for f in fail_cfg), gfo['note']))
 
+    if hfo is not None:  # add final workout if file doesn't end with empty line
+        workouts.append(hfo)
     return workouts
 
 # ----------------------------------------------------------------------------------------
@@ -261,9 +265,14 @@ def plot_single_grip(gripname):
     # ----------------------------------------------------------------------------------------
     def plot_set(set_key, vbar=True):
         for n_days_list, lw_list, sf_list in zip(mfos['sessions'], mfos[set_key + '-weights'], mfos[set_key + '-send-fractions']):
-            ax.plot(n_days_list, lw_list, linewidth=3, alpha=0.7, markersize=15, marker='.', color='grey')
+            # filter out NaN values for plotting
+            valid = [(nd, lw, sf) for nd, lw, sf in zip(n_days_list, lw_list, sf_list) if not numpy.isnan(lw)]
+            if not valid:
+                continue
+            valid_nds, valid_lws, valid_sfs = zip(*valid)
+            ax.plot(valid_nds, valid_lws, linewidth=3, alpha=0.7, markersize=15, marker='.', color='grey')
             if vbar:
-                for nd, lw, sf in zip(n_days_list, lw_list, sf_list):
+                for nd, lw, sf in zip(valid_nds, valid_lws, valid_sfs):
                     if sf == 0:  # unknown (should change this)
                         ax.text(nd - 0.25, lw + 0.25 * min_weight_increment, '?')
                     else:
@@ -289,6 +298,8 @@ def plot_single_grip(gripname):
             if gripname not in hfo['grips']:
                 continue
             if hfo['session'] == 1:
+                if len(mfos['sessions']) > 0:  # add gap between blocks (but not before first block)
+                    isession += 2
                 for tk in mfos:
                     mfos[tk].append([])
 

@@ -3,7 +3,7 @@
 # NOTE can't run this script as a whole in one go, the idea is you copy/paste bits
 
 # i don't think the pip stuff is right
-sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python3-dev python3-pip python3-build python3-wheel python-is-python3 inkscape tmux units htop scrot scons texlive-full latexmk curl mafft tesseract-ocr iotop npm colordiff
+sudo apt install build-essential libx11-dev gnutls-dev libxpm-dev libgif-dev libtinfo-dev git openssh-server i3 xfce4-terminal sshfs feh mosh gnome-screensaver python3-dev python3-pip python3-build python3-wheel python-is-python3 inkscape tmux units htop scrot scons texlive-full latexmk curl mafft tesseract-ocr iotop npm colordiff python3-termcolor
 sudo snap install marktext #glow
 # # ----------------------------------------------------------------------------------------
 # # Install essential linear algebra libraries
