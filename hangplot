@@ -26,12 +26,10 @@ min_weight_increment = 5  # minimum weight increment between sets/workouts
 # ----------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
 parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
-# parser.add_argument('--start-date')
 parser.add_argument('--years', default='2019:2020:2022:2023:2024:2025') #2018, 2019, 2020])
 parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:IM')  # :thin-pinch
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))
-parser.add_argument('--half-window', type=float, default=2.5, help='half width of window for averaging weights')
 parser.add_argument('--debug', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
@@ -42,19 +40,6 @@ args.years = args.years.split(':')
 args.plot_grips = args.plot_grips.replace('-', ' ').split(':')
 
 mfos = tutils.read_mfos(args)
-
-# if args.start_date is not None:
-#     # args.start_date = datetime.fromisoformat('2019-01-04')  # new in python 3.7, darn it
-#     try:
-#         args.start_date = datetime.strptime(args.start_date, '%Y-%b-%d')
-#     except ValueError:
-#         raise Exception('--start-date must be of form 2019-Jun-1')
-#     if args.debug:
-#         print args.start_date
-#     # Thu May 21 22:03:29 PDT 2015
-# args.half_window = timedelta(days=args.half_window)
-
-# # dtime = datetime.strptime(datestr.strip(), '%a %b %d %H:%M:%S %Z %Y')  # for later plotting use
 
 # ----------------------------------------------------------------------------------------
 # bash color codes
@@ -303,10 +288,6 @@ def plot_single_grip(gripname):
                 for tk in mfos:
                     mfos[tk].append([])
 
-            # x values
-            # if start_date is None:
-            #     start_date = hfo['date']
-            # mfos['n-days'][-1].append((hfo['date'] - start_date).days)
             if len(mfos['sessions']) == 0:
                 continue
             mfos['sessions'][-1].append(isession)
@@ -351,19 +332,6 @@ def plot_single_grip(gripname):
             mfos['last-but-one-send-fractions'][-1].append(send_times[0] / total_times[0])
             mfos['last-send-fractions'][-1].append(send_times[1] / total_times[1])
 
-    # # ----------------------------------------------------------------------------------------
-    # tmp_date = copy.deepcopy(args.start_date)
-    # tickmonths = list(range(1, 13)) if (end_date - args.start_date) < timedelta(days=500) else list(range(1, 13, 2))
-    # while tmp_date < end_date:
-    #     if tmp_date.day == tickday and tmp_date.month in tickmonths:
-    #         xticks.append((tmp_date - args.start_date).days)
-    #         xtl = '%s %d' % (calendar.month_abbr[tmp_date.month], tickday)
-    #         if tmp_date.month == 1:
-    #             xtl = '%d %s' % (tmp_date.year, xtl)
-    #         xticklabels.append(xtl)
-    #     tmp_date += timedelta(days=1)
-    # # for dates, weights in mfos.values():
-
     dpi = 80
     xpixels, ypixels = 2500, 700
     fig, ax = plt.subplots(figsize=(xpixels / dpi, ypixels / dpi))
@@ -387,11 +355,6 @@ def plot_single_grip(gripname):
 # ----------------------------------------------------------------------------------------
 tickday = 1
 # max_delta = timedelta(days=7)
-
-start_date = None
-# end_date = None
-# if end_date is None:
-#     end_date = mfos['dates'][-1]
 
 for gname in args.plot_grips:
     plot_single_grip(gname)
