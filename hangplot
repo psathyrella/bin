@@ -25,12 +25,13 @@ min_weight_increment = 5  # minimum weight increment between sets/workouts
 
 # ----------------------------------------------------------------------------------------
 parser = argparse.ArgumentParser()
-parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
+parser.add_argument('--mfile', default='%s/Dropbox/hill/training/m.csv' % os.getenv('HOME'))
 parser.add_argument('--years', default='2019:2020:2022:2023:2024:2025') #2018, 2019, 2020])
 parser.add_argument('--plot-grips', default='half-crimp:full-crimp:MRP:med-pinch:MR:IM')  # :thin-pinch
 parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--plotdir', default='%s/hangplots' % os.getenv('HOME'))
 parser.add_argument('--debug', action='store_true')
+parser.add_argument('--add-body-weight', action='store_true', help='add body weight to plotted weights')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
 args = parser.parse_args()
@@ -299,9 +300,9 @@ def plot_single_grip(gripname):
                 xticklabels.append('%d %s \'%d' % (hfo['date'].day, calendar.month_abbr[hfo['date'].month], hfo['date'].year - 2000))
 
             gfo = hfo['grips'][gripname]
-            # body_weight = hfo.get('weight', 0)
-            mfos['last-weights'][-1].append(gfo['added-weights'][-1])  # body_weight +
-            mfos['last-but-one-weights'][-1].append(gfo['added-weights'][-2])  # body_weight +
+            body_weight = hfo.get('weight', 0) if args.add_body_weight else 0
+            mfos['last-weights'][-1].append(body_weight + gfo['added-weights'][-1])
+            mfos['last-but-one-weights'][-1].append(body_weight + gfo['added-weights'][-2])
 
             dbg = False #hfo['session'] == 8
             total_times = [n * float(hfo['cfg']['work_time']) for n in hfo['cfg']['n_reps']]

@@ -17,7 +17,7 @@ import tutils
 # mappend -1 --plot --start-date 2019-Jun-1
 parser = argparse.ArgumentParser()
 parser.add_argument('mlist', nargs='*', type=float)
-parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
+parser.add_argument('--mfile', default='%s/Dropbox/hill/training/m.csv' % os.getenv('HOME'))
 parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
