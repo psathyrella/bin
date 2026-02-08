@@ -96,6 +96,8 @@ def plot_acty(actstr):
             args.start_date = tfo['date']
         elif args.start_date > tfo['date']:
             continue
+        if args.stop_date is not None and tfo['date'] > args.stop_date:
+            break
         mfos['dates'].append(tfo['date'])
         hour_str = tfo.get(actstr, {'hours' : 0})['hours']
         if hour_str is None:
@@ -113,6 +115,7 @@ def plot_acty(actstr):
 # ----------------------------------------------------------------------------------------
 helpstr="""
 trainparse --debug --start-date 2021-Apr-15 --half-window 7
+trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31
 """
 parser = argparse.ArgumentParser(description=helpstr)
 # parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
