@@ -24,7 +24,8 @@ def process_args(args):
     for aname in ['start_date', 'stop_date']:
         process_date(aname)
     args.half_window = timedelta(days=args.half_window)
-    args.weekly_half_window = timedelta(days=args.weekly_half_window)
+    if hasattr(args, 'weekly_half_window'):
+        args.weekly_half_window = timedelta(days=args.weekly_half_window)
 
 # ----------------------------------------------------------------------------------------
 def parsetime(instr, debug=False):
@@ -135,13 +136,17 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1):
 
     ax.plot(mfos['n_days'], mfos[yvar], linewidth=0, alpha=0.7, markersize=15, marker='.', label=yvar)
     ax.plot(mfos['n_days'], mfos['float_avgs'], linewidth=3, alpha=0.6, label='%d-day avg' % (2 * args.half_window.days + 1))
-    ax.axhline(y=5.7, color='tab:orange', linestyle='--', alpha=0.5, linewidth=3)
-    ax.set_ylabel('hours/day')
+    if yvar == 'weights':
+        ax.set_ylabel('weight')
+    else:
+        ax.axhline(y=5.7, color='tab:orange', linestyle='--', alpha=0.5, linewidth=3)
+        ax.set_ylabel('hours/day')
+        ax.set_ylim(bottom=0)
 
     if 'weekly_avgs' in mfos:
         ax2 = ax.twinx()
         ax2.plot(mfos['n_days'], mfos['weekly_avgs'], linewidth=3, alpha=0.6, color='green', label='%d-day avg hrs/week' % (2 * args.weekly_half_window.days + 1))
-        ax2.axhline(y=40, color='green', linestyle='--', alpha=0.5, linewidth=3)
+        ax2.axhline(y=37, color='green', linestyle='--', alpha=0.5, linewidth=3)
         ax2.set_ylim(bottom=0)
         ax2.set_ylabel('hours/week', color='green')
         ax2.tick_params(axis='y', labelcolor='green')
