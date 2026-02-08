@@ -2,8 +2,10 @@
 
 sname=$1
 if [ "$sname" == "" ]; then
-    sname=partis
+    echo "ERROR need to pass session name"
+    exit 1
 fi
+
 if tmux has-session -t $sname &>/dev/null; then
     echo "session $sname already already exists"
     exit 0
@@ -26,9 +28,10 @@ fi
 
 tmux new-session -d -c $sdir -s $sname -n emacs
 if [ -f ~/Dropbox/bin/$sname-files.txt ]; then
-    files="`cat ~/Dropbox/bin/$sname-files.txt`"
+    tmux send-keys -t $sname:emacs "emacs ~/Dropbox/work/todo `cat ~/Dropbox/bin/$sname-files.txt`" Enter
+else
+    tmux send-keys -t $sname:emacs "emacs" Enter
 fi
-tmux send-keys -t $sname:emacs "emacs $files" Enter
 tmux new-window -t $sname -c $sdir -n shell
 tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 tmux send-keys -t $sname:shell "export HISTFILESIZE=10000" Enter
@@ -39,13 +42,9 @@ tmux send-keys -t $sname:shell "echo \"run history -r to append histfile content
 # append to bash history: history -a
 # append contents of bash history file to this terminal's history list (NOTE -c clears this terminal's history without saving it anywhere, so you'd probably actually want to do this somewhat differently): history -c; history -r
 # tmux send-keys -t $sname:shell "history -w" Enter
-if [ "$sname" == "partis" ]; then
-    tmux send-keys -t $sname:shell "export pies=\"partis/*.py bin/*.py test/*.py projects/*.py\"" Enter
-else
-    tmux send-keys -t $sname:shell "export pies=\"$files\"" Enter
-fi
+tmux send-keys -t $sname:shell "export pies=\"`cat ~/Dropbox/bin/$sname-files.txt`\"" Enter
 tmux send-keys -t $sname:shell "#git checkout main && git merge dev && git checkout dev && git push origin main" Enter
-tmux send-keys -t $sname:shell "#grep -rn \".\" pies" Enter
+tmux send-keys -t $sname:shell "#grep -rn \"foop\" \$pies" Enter
 # NOTE don't use this any more, use ~/Dropbox/bin/gd  old:   tmux send-keys -t $sname:shell "#git diff >~/Dropbox/wip.patch" Enter
 tmux new-window -t $sname -c $sdir -n s0
 tmux new-window -t $sname -c $sdir -n s1

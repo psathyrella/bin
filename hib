@@ -1,10 +1,12 @@
 #!/bin/bash
 if [ `hostname` == "glorax" ]; then
     dropbox stop
-    fhumount
+    fhumount -z
     echo "suspending (need to set up hibernate)"
     sudo systemctl suspend
 else
-    fhumount
+    fhumount -z
+    # flush caches to maybe keep hibernate from failing:
+    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
     sudo systemctl hibernate
 fi
