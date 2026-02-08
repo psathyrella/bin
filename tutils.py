@@ -24,6 +24,7 @@ def process_args(args):
     for aname in ['start_date', 'stop_date']:
         process_date(aname)
     args.half_window = timedelta(days=args.half_window)
+    args.weekly_half_window = timedelta(days=args.weekly_half_window)
 
 # ----------------------------------------------------------------------------------------
 def parsetime(instr, debug=False):
@@ -45,8 +46,8 @@ def parsetime(instr, debug=False):
     return returnval
 
 # ----------------------------------------------------------------------------------------
-def add_float_averages(mfos, yvar, half_window, debug=False):
-    mfos['float_avgs'] = []
+def add_float_averages(mfos, yvar, half_window, output_key='float_avgs', debug=False):
+    mfos[output_key] = []
     last_dtime = None  # just for dbg
     for idt, (dtime, wgt) in enumerate(zip(mfos['dates'], mfos[yvar])):
         wgtlist, dtlist = [], []  # <dtlist> is just for dbg
@@ -69,7 +70,10 @@ def add_float_averages(mfos, yvar, half_window, debug=False):
             dtlist.append(mfos['dates'][itmp])
             itmp += 1
 
-        mfos['float_avgs'].append(numpy.mean(wgtlist))
+        if len(wgtlist) > 0:
+            mfos[output_key].append(sum(wgtlist) / len(wgtlist))
+        else:
+            mfos[output_key].append(0)
         if debug:
             # ----------------------------------------------------------------------------------------
             def dfcn(attr):
@@ -83,7 +87,7 @@ def add_float_averages(mfos, yvar, half_window, debug=False):
                 # return ('%.'+str(2 if tmp_ddays < 1 else 0)+'f') % tmp_ddays
                 return '%4.1f' % tmp_ddays
             # ----------------------------------------------------------------------------------------
-            print('    %4s %3s %3s     %-22s   %s' % (dfcn('year'), dfcn('month'), dfcn('day'), ' '.join('%2d'%dt.day for dt in sorted(dtlist)), ' '.join(dstr(dt) for dt in sorted(dtlist))))
+            print('    %4s %3s %3s     %-22s   %s  (total: %d)' % (dfcn('year'), dfcn('month'), dfcn('day'), ' '.join('%2d'%dt.day for dt in sorted(dtlist)), ' '.join(dstr(dt) for dt in sorted(dtlist)), len(wgtlist)))
         last_dtime = dtime
 
 # ----------------------------------------------------------------------------------------
@@ -129,13 +133,25 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1):
     fig.tight_layout()
     plt.gcf().subplots_adjust(bottom=0.27, left=0.2, right=0.78, top=0.92)
 
-    ax.plot(mfos['n_days'], mfos[yvar], linewidth=0, alpha=0.7, markersize=15, marker='.')
-    ax.plot(mfos['n_days'], mfos['float_avgs'], linewidth=3, alpha=0.7)
+    ax.plot(mfos['n_days'], mfos[yvar], linewidth=0, alpha=0.7, markersize=15, marker='.', label=yvar)
+    ax.plot(mfos['n_days'], mfos['float_avgs'], linewidth=3, alpha=0.6, label='%d-day avg' % (2 * args.half_window.days + 1))
+    ax.axhline(y=5.7, color='tab:orange', linestyle='--', alpha=0.5, linewidth=3)
+    ax.set_ylabel('hours/day')
+
+    if 'weekly_avgs' in mfos:
+        ax2 = ax.twinx()
+        ax2.plot(mfos['n_days'], mfos['weekly_avgs'], linewidth=3, alpha=0.6, color='green', label='%d-day avg hrs/week' % (2 * args.weekly_half_window.days + 1))
+        ax2.axhline(y=40, color='green', linestyle='--', alpha=0.5, linewidth=3)
+        ax2.set_ylim(bottom=0)
+        ax2.set_ylabel('hours/week', color='green')
+        ax2.tick_params(axis='y', labelcolor='green')
 
     plt.xticks(xticks)
     ax.grid(axis='y')
-    ax.tick_params(labelright=True)
     ax.set_xticklabels(xticklabels, rotation='vertical')
+    lines1, labels1 = ax.get_legend_handles_labels()
+    lines2, labels2 = (ax2.get_legend_handles_labels() if 'weekly_avgs' in mfos else ([], []))
+    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(0, 1.15), ncol=len(lines1) + len(lines2))
     plt.savefig(args.plotfile)
 
 # ----------------------------------------------------------------------------------------

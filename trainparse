@@ -22,16 +22,19 @@ def parse_trfile(year):
     def init_tfo(line):
         tfo = {}
         lstrs = line.split()
-        if len(lstrs) < 3:
-            raise Exception('lstrs must be len at least 3 but got %d for %s' % (len(lstrs), line))
         try:
             day = int(lstrs[0])
         except:
             raise Exception('couldn\'t parse day from \'%s\'' % line)
-        month = lstrs[1].capitalize()
+        month = lstrs[1].capitalize() if len(lstrs) > 1 else None
         if month not in calendar.month_abbr:
             raise Exception('couldn\'t parse month from \'%s\'' % line)
-        tfo['date'] = datetime(year=year, month=list(calendar.month_abbr).index(month), day=day)  # initialization time, I think (probably utc)
+        tfo['date'] = datetime(year=year, month=list(calendar.month_abbr).index(month), day=day)
+        if len(lstrs) < 3:
+            if tfo['date'].date() == datetime.today().date():
+                return None  # skip today since it's probably not complete
+            else:
+                raise Exception('date line must be len at least 3 but got %d for line \'%s\'' % (len(lstrs), line))
         tfo['xo'] = lstrs[2]
         return tfo
     # ----------------------------------------------------------------------------------------
@@ -60,7 +63,7 @@ def parse_trfile(year):
                 if tfo is not None and tfo['date'].date() != datetime.today().date():  # add the last day to <trainfos> (skip today since it's probably not complete)
                     trainfos.append(tfo)
                 tfo = init_tfo(line)
-            else:
+            elif tfo is not None:  # skip lines if tfo is None (today's incomplete entry)
                 add_to_tfo(tfo, line)
     return trainfos
 
@@ -101,7 +104,10 @@ def plot_acty(actstr):
         mfos['n_days'].append((tfo['date'] - args.start_date).days)
     if len(mfos['dates']) == 0:
         raise Exception('no dates passing start date %s' % args.start_date)
+
     tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
+    tutils.add_float_averages(mfos, 'hours', args.weekly_half_window, output_key='weekly_avgs')
+    mfos['weekly_avgs'] = [v * 7 for v in mfos['weekly_avgs']]
     tutils.plot_mfos(args, mfos, 'hours')
 
 # ----------------------------------------------------------------------------------------
@@ -113,8 +119,9 @@ parser = argparse.ArgumentParser(description=helpstr)
 # parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
-parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.png', help='output png file name')
+parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.jpg', help='output jpg file name')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
+parser.add_argument('--weekly-half-window', type=float, default=15, help='half width of window for weekly hours average (default 45.5 = ~3 months)')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
