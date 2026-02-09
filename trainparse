@@ -107,10 +107,46 @@ def plot_acty(actstr):
     if len(mfos['dates']) == 0:
         raise Exception('no dates passing start date %s' % args.start_date)
 
+    # validate that every calendar day has an entry
+    for i in range(1, len(mfos['dates'])):
+        gap = (mfos['dates'][i] - mfos['dates'][i-1]).days
+        if gap != 1:
+            raise Exception('missing %d day(s) between %s and %s' % (gap - 1, mfos['dates'][i-1].date(), mfos['dates'][i].date()))
+
+    # detect vacation periods: in each streak of consecutive zero-hour days,
+    # the first 2 are treated as a normal weekend; any beyond that are vacation
+    vacation_dates = set()
+    run_start = None
+    for i, (dt, hrs) in enumerate(zip(mfos['dates'], mfos['hours'])):
+        if hrs == 0:
+            if run_start is None:
+                run_start = i
+        else:
+            if run_start is not None:
+                n_vac = (i - run_start) - 2
+                if n_vac > 0:
+                    for j in range(run_start + 2, i):
+                        vacation_dates.add(mfos['dates'][j])
+                    print('      %d vacation days in %d-day streak: %s - %s'
+                          % (n_vac, i - run_start, mfos['dates'][run_start+2].date(), mfos['dates'][i-1].date()))
+            run_start = None
+    # handle run extending to end
+    if run_start is not None:
+        run_end = len(mfos['dates'])
+        n_vac = (run_end - run_start) - 2
+        if n_vac > 0:
+            for j in range(run_start + 2, run_end):
+                vacation_dates.add(mfos['dates'][j])
+
+    n_non_vacation = len(mfos['dates']) - len(vacation_dates)
+    total_hours = sum(h for d, h in zip(mfos['dates'], mfos['hours']) if d not in vacation_dates)
+    avg_hrs_per_week = total_hours / n_non_vacation * 7 if n_non_vacation > 0 else 0
+    print('    %.1f hrs/week average (%d vacation days excluded)' % (avg_hrs_per_week, len(vacation_dates)))
+
     tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
-    tutils.add_float_averages(mfos, 'hours', args.weekly_half_window, output_key='weekly_avgs')
-    mfos['weekly_avgs'] = [v * 7 for v in mfos['weekly_avgs']]
-    tutils.plot_mfos(args, mfos, 'hours')
+    tutils.add_float_averages(mfos, 'hours', args.weekly_half_window, output_key='weekly_avgs', exclude_dates=vacation_dates)
+    mfos['weekly_avgs'] = [float('nan') if d in vacation_dates else v * 7 for d, v in zip(mfos['dates'], mfos['weekly_avgs'])]
+    tutils.plot_mfos(args, mfos, 'hours', vacation_dates=vacation_dates, avg_hrs_per_week=avg_hrs_per_week)
 
 # ----------------------------------------------------------------------------------------
 helpstr="""
