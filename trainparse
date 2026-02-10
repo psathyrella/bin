@@ -113,30 +113,33 @@ def plot_acty(actstr):
         if gap != 1:
             raise Exception('missing %d day(s) between %s and %s' % (gap - 1, mfos['dates'][i-1].date(), mfos['dates'][i].date()))
 
-    # detect vacation periods: in each streak of consecutive zero-hour days,
-    # the first 2 are treated as a normal weekend; any beyond that are vacation
+    # detect vacation periods using sliding 7-day window density
     vacation_dates = set()
-    run_start = None
-    for i, (dt, hrs) in enumerate(zip(mfos['dates'], mfos['hours'])):
-        if hrs == 0:
-            if run_start is None:
-                run_start = i
-        else:
-            if run_start is not None:
-                n_vac = (i - run_start) - 2
-                if n_vac > 0:
-                    for j in range(run_start + 2, i):
-                        vacation_dates.add(mfos['dates'][j])
-                    print('      %d vacation days in %d-day streak: %s - %s'
-                          % (n_vac, i - run_start, mfos['dates'][run_start+2].date(), mfos['dates'][i-1].date()))
-            run_start = None
-    # handle run extending to end
-    if run_start is not None:
-        run_end = len(mfos['dates'])
-        n_vac = (run_end - run_start) - 2
-        if n_vac > 0:
-            for j in range(run_start + 2, run_end):
-                vacation_dates.add(mfos['dates'][j])
+    zero_days = [i for i, hrs in enumerate(mfos['hours']) if hrs == 0]
+    # mark zero-hour days where the 7-day centered window has >= threshold zero days
+    candidates = set()
+    for i in zero_days:
+        window_start = max(0, i - 3)
+        window_end = min(len(mfos['hours']), i + 4)  # exclusive
+        n_zeros = sum(1 for j in range(window_start, window_end) if mfos['hours'][j] == 0)
+        if n_zeros >= args.vacation_threshold:
+            candidates.add(i)
+    # group candidates into stretches (allow gaps up to 3 days, matching window half-width); exempt first 2 per stretch
+    stretches = []
+    cur_stretch = []
+    for i in sorted(candidates):
+        if cur_stretch and (i > cur_stretch[-1] + 3 or i - cur_stretch[0] >= 7):  # cap stretch at 7 days (if it's longer we want to start a new stretch so two new 'weekend' days get excluded)
+            stretches.append(cur_stretch)
+            cur_stretch = []
+        cur_stretch.append(i)
+    if cur_stretch:
+        stretches.append(cur_stretch)
+    for stretch in stretches:
+        for idx in stretch[2:]:  # first 2 are treated as normal weekend
+            vacation_dates.add(mfos['dates'][idx])
+        if len(stretch) > 2:
+            print('      %d vacation days in %d-day stretch: %s - %s'
+                  % (len(stretch) - 2, len(stretch), mfos['dates'][stretch[2]].date(), mfos['dates'][stretch[-1]].date()))
 
     n_non_vacation = len(mfos['dates']) - len(vacation_dates)
     total_hours = sum(h for d, h in zip(mfos['dates'], mfos['hours']) if d not in vacation_dates)
@@ -161,6 +164,7 @@ parser.add_argument('--stop-date', help='see --start-date')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.jpg', help='output jpg file name')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
 parser.add_argument('--weekly-half-window', type=float, default=15, help='half width of window for weekly hours average (default 45.5 = ~3 months)')
+parser.add_argument('--vacation-threshold', type=int, default=3, help='number of zero-hour days in a 7-day window that triggers vacation detection (first 2 zero days in each stretch are treated as normal weekend)')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
