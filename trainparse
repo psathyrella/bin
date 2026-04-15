@@ -59,6 +59,8 @@ def parse_trfile(year):
         tfo = None
         for line in tfile:
             line = line.rstrip('\n')
+            if not line:
+                continue
             if line[0] != ' ':  # new day
                 if tfo is not None and tfo['date'].date() != datetime.today().date():  # add the last day to <trainfos> (skip today since it's probably not complete)
                     trainfos.append(tfo)
@@ -138,13 +140,13 @@ def plot_acty(actstr):
         for idx in stretch[2:]:  # first 2 are treated as normal weekend
             vacation_dates.add(mfos['dates'][idx])
         if len(stretch) > 2:
-            print('      %d vacation days in %d-day stretch: %s - %s'
+            print('      %d vacation+sick days in %d-day stretch: %s - %s'
                   % (len(stretch) - 2, len(stretch), mfos['dates'][stretch[2]].date(), mfos['dates'][stretch[-1]].date()))
 
     n_non_vacation = len(mfos['dates']) - len(vacation_dates)
     total_hours = sum(h for d, h in zip(mfos['dates'], mfos['hours']) if d not in vacation_dates)
     avg_hrs_per_week = total_hours / n_non_vacation * 7 if n_non_vacation > 0 else 0
-    print('    %.1f hrs/week average (%d vacation days excluded)' % (avg_hrs_per_week, len(vacation_dates)))
+    print('    %.1f hrs/week average (%d vacation+sick days excluded)' % (avg_hrs_per_week, len(vacation_dates)))
 
     tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
     tutils.add_float_averages(mfos, 'hours', args.weekly_half_window, output_key='weekly_avgs', exclude_dates=vacation_dates)

@@ -147,7 +147,7 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1, vacation_dates=None, a
 
     if 'weekly_avgs' in mfos:
         ax2 = ax.twinx()
-        ax2.plot(mfos['n_days'], mfos['weekly_avgs'], linewidth=3, alpha=0.6, color='green', label='%d-day avg hrs/week (exclud. vac.)' % (2 * args.weekly_half_window.days + 1))
+        ax2.plot(mfos['n_days'], mfos['weekly_avgs'], linewidth=3, alpha=0.6, color='green', label='%d-day avg hrs/week (exclud. vac.+sick)' % (2 * args.weekly_half_window.days + 1))
         ax2.axhline(y=40, color='green', linestyle='--', alpha=0.5, linewidth=3)
         weekly_max = max(v for v in mfos['weekly_avgs'] if not numpy.isnan(v))
         ax2.set_ylim(0, weekly_max * 1.15)
@@ -179,9 +179,9 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1, vacation_dates=None, a
             x0 = (s - args.start_date).days - 0.5
             x1 = (e - args.start_date).days + 0.5
             ax.axvspan(x0, x1, alpha=0.15, color='red')
-        vac_str = '%d vacation days' % len(sorted_vdates)
+        vac_str = '%d vacation+sick days' % len(sorted_vdates)
         if avg_hrs_per_week is not None:
-            vac_str = '%.1f hrs/week avg (exclud. vac.),  %s' % (avg_hrs_per_week, vac_str)
+            vac_str = '%.1f hrs/week avg (exclud. vac.+sick),  %s' % (avg_hrs_per_week, vac_str)
         ax.text(0.98, 1.04, vac_str, transform=ax.transAxes, ha='right', va='bottom', fontsize=18, color='red')
 
     plt.savefig(args.plotfile)

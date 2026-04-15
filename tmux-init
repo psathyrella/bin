@@ -37,7 +37,7 @@ tmux send-keys -t $sname:shell "export HISTFILE=~/.history/$sname-shell" Enter
 tmux send-keys -t $sname:shell "export HISTFILESIZE=10000" Enter
 tmux send-keys -t $sname:shell "export HISTCONTROL=ignoredups" Enter
 tmux send-keys -t $sname:shell "export PROMPT_COMMAND=\"history -a\"" Enter  # this appends the current shell's history to HISTFILE, whereas 'history -r' appends HISTFILE contents to the current shell's history (i.e. run the latter when you start a new tmux session)
-tmux send-keys -t $sname:shell "echo \"run history -r to append histfile contents to history\"" Enter
+tmux send-keys -t $sname:shell "history -r" Enter  # append histfile contents to history
 # tmux send-keys -t $sname:shell ". hsleep &" Enter
 # append to bash history: history -a
 # append contents of bash history file to this terminal's history list (NOTE -c clears this terminal's history without saving it anywhere, so you'd probably actually want to do this somewhat differently): history -c; history -r

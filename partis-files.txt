@@ -1,1 +1,1 @@
-partis/*.py bin/*.py test/*.py projects/*.py datascripts/*.py
+partis/*.py bin/*.py test/*.py projects/*.py datascripts/*.py bin/partis
