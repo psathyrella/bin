@@ -1,0 +1,22 @@
+#!/bin/bash
+# Enable external monitor above eDP-1 and move designated workspaces to it.
+# Bound to Ctrl+Alt+x in ~/.config/i3/config.
+set -e
+
+ext=$(find-dp-number)
+xrandr --output "$ext" --auto --above eDP-1
+
+# Give i3 a moment to register the new output before issuing moves.
+sleep 0.3
+
+current=$(i3-msg -t get_workspaces | python3 -c 'import json,sys; ws=json.load(sys.stdin); print(next(w["name"] for w in ws if w["focused"]))')
+
+# Target the external output by name so this is idempotent — using
+# "output up" wraps around when a workspace is already on the external,
+# which causes a toggle on repeat invocations.
+for ws in 1 2 4 7 8 9; do
+    i3-msg "workspace number $ws; move workspace to output $ext" >/dev/null
+done
+
+# Return focus to wherever we started (or workspace 1 if that's gone).
+i3-msg "workspace $current" >/dev/null 2>&1 || i3-msg "workspace number 1" >/dev/null
