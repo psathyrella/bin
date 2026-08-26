@@ -1,0 +1,27 @@
+#!/bin/bash
+# Apply whichever xmodmap config matches the currently attached keyboard.
+# Run at login and from inputplug on every input hotplug event.
+
+# X input name of the external keyboard. Anchored so it doesn't also match the
+# receiver's Mouse / Consumer Control / System Control siblings.
+exkb_name='Nano Transceiver v2\.1$'
+
+cfgdir=~/.config/xmodmap
+state=${XDG_RUNTIME_DIR:-/tmp}/xmd-current
+log=${XDG_RUNTIME_DIR:-/tmp}/xmd-auto.log
+
+if xinput list --name-only 2>/dev/null | grep -q "$exkb_name" \
+   && [ -r "$cfgdir/`hostname`-exkb.cfg" ]; then
+    want=exkb
+else
+    want=
+fi
+
+# inputplug fires once per device and the external receiver presents six of
+# them, so skip if the wanted config is already applied. -f forces a re-apply,
+# for the i3 startup call, where the keymap may have been reset since.
+if [ "$1" != "-f" ]; then
+    [ "$(cat "$state" 2>/dev/null)" = "$want" ] && exit 0
+fi
+
+xmd $want >> "$log" 2>&1

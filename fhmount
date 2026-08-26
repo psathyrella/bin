@@ -1,5 +1,26 @@
 #!/bin/bash
 
+# --- If firefox/a file manager/a shell is FROZEN on a hung /fh mount ---
+# Any process that touches a path on a hung fuse mount blocks uninterruptibly in the kernel
+# (wchan 'request_wait_answer') until the connection is aborted. Re-running fhmount does NOT
+# release an already-stuck request — it just makes a new connection. To unfreeze without killing
+# the app, abort the dead connection so its pending requests fail with EIO:
+#   1. find the connection minor (the 0:<N>) backing /fh:
+#        grep matsen_e /proc/self/mountinfo      # -> field 3 is 0:<N>
+#   2. abort it (file is user-owned, no sudo needed for your own mount):
+#        echo 1 > /sys/fs/fuse/connections/<N>/abort
+#   The frozen app(s) release within a few seconds. Then re-run fhmount for a clean mount.
+# (To confirm what's stuck first: ps -eLo pid,tid,wchan,comm | grep request_wait_answer)
+
+MNT=`fhd`
+
+# thneed: CIFS direct to center.fhcrc.org (on-campus, no VPN). Options live in /etc/fstab.
+if [ "$(hostname)" = "thneed" ]; then
+    mountpoint -q "$MNT" && sudo umount "$MNT"
+    mount "$MNT"
+    exit $?
+fi
+
 # need to kill any existing sshfs processes, since they can cause e.g. firefox to hang if the internet connections is dodgy
 pps | grep sshfs | grep -v grep | grep ' dralph '
 for pid in `pps | grep sshfs | grep -v grep | grep ' dralph ' | ap 8`; do
@@ -7,6 +28,13 @@ for pid in `pps | grep sshfs | grep -v grep | grep ' dralph ' | ap 8`; do
     kill -9 $pid
 done
 
-# reconnection is causing out of control ssh processes on oubli, so not using: ,reconnect,ServerAliveInterval=15,ServerAliveCountMax=3
-sshfs -o allow_other,default_permissions,uid=1000,gid=1000 ermine:/fh/fast/matsen_e `fhd` -C
+# kill -9 alone leaves the mountpoint stale, and any process that touches it (firefox, file
+# managers, a shell) then hangs uninterruptibly in the kernel's fuse request_wait_answer until
+# the connection is aborted. Lazy-unmount to clear the orphaned mountpoint cleanly.
+fusermount -uz "$MNT" 2>/dev/null
+
+# ServerAlive* makes a silently-dead SSH link (sleep/wifi blip/VPN/idle-timeout) get detected in
+# ~45s, so the mount FAILS FAST (ENOTCONN, like "not found") instead of hanging firefox/everything
+# forever. NOT using 'reconnect' (that's what caused runaway ssh on oubli — keepalive alone is safe).
+sshfs -o allow_other,default_permissions,uid=1000,gid=1000,ServerAliveInterval=15,ServerAliveCountMax=3 ermine:/fh/fast/matsen_e "$MNT" -C
 # verbose/debug option: -o debug,

@@ -1,4 +1,5 @@
 #!/bin/bash
+# Apply an xmodmap config: <hostname>.cfg with no argument, <hostname>-<arg>.cfg with one.
 
 cfgdir=~/.config/xmodmap
 
@@ -9,5 +10,18 @@ else
     cfgfn=$cfgdir/`hostname`.cfg
 fi
 
+# Reset to the base keymap first. xmodmap leaves any keycode a config doesn't
+# mention untouched, so without this, remappings from the previously applied
+# config linger (e.g. keycode 107 staying Control_L after switching to -exkb).
+if [ -r /etc/default/keyboard ]; then
+    . /etc/default/keyboard
+    args=(-model "$XKBMODEL" -layout "$XKBLAYOUT" -option -option "$XKBOPTIONS")
+    [ -n "$XKBVARIANT" ] && args+=(-variant "$XKBVARIANT")
+    setxkbmap "${args[@]}"
+fi
+
 echo "executing xmodmap $cfgfn on `date`"
 xmodmap $cfgfn
+
+# Record what's applied so xmd-auto can skip redundant work.
+echo "$cfgstr" > "${XDG_RUNTIME_DIR:-/tmp}/xmd-current"

@@ -1,0 +1,3 @@
+#!/bin/bash
+# Wrapper so the systemd unit doesn't have to hardcode the handler path.
+exec inputplug -d -c ~/Dropbox/bin/xmd-auto
