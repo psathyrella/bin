@@ -28,7 +28,7 @@ cat ~/.ssh/id_ed25519.pub
 git clone git@github.com:psathyrella/config
 cp -rTv config ~  # this is a little risky, e.g. it does overwrite some changes in bashrc which maybe I should keep some of
 
-xmodmap .xmodmap  # aaaaaah, yeah  NOTE now I think should use xmd command from Dropbox/bin
+xmodmap .xmodmap  # aaaaaah, yeah  NOTE now I think should use xmd command from ~/bin
 
 git clone git@github.com:psathyrella/emacs.d
 mv emacs.d .emacs.d
