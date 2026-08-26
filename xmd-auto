@@ -6,6 +6,9 @@
 # receiver's Mouse / Consumer Control / System Control siblings.
 exkb_name='Nano Transceiver v2\.1$'
 
+# Resolve xmd next to this script: PATH isn't set when systemd runs us.
+xmd=$(dirname "$(readlink -f "$0")")/xmd
+
 cfgdir=~/.config/xmodmap
 state=${XDG_RUNTIME_DIR:-/tmp}/xmd-current
 log=${XDG_RUNTIME_DIR:-/tmp}/xmd-auto.log
@@ -24,4 +27,4 @@ if [ "$1" != "-f" ]; then
     [ "$(cat "$state" 2>/dev/null)" = "$want" ] && exit 0
 fi
 
-xmd $want >> "$log" 2>&1
+"$xmd" $want >> "$log" 2>&1
