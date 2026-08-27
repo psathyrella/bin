@@ -2,6 +2,7 @@
 # Enable external monitor above eDP-1 and move designated workspaces to it.
 # Bound to Ctrl+Alt+x in ~/.config/i3/config.
 set -e
+PATH="$HOME/bin:$PATH"  # i3 launches us with the PATH its session started with, which may predate ~/bin
 
 ext=$(find-dp-number)
 xrandr --output "$ext" --auto --above eDP-1

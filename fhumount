@@ -1,3 +1,4 @@
 #!/bin/bash
 # add -z (lazy) if it's hanging
+PATH="$HOME/bin:$PATH"  # i3 launches us with the PATH its session started with, which may predate ~/bin
 fusermount -u $* `fhd`
