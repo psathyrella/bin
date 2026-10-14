@@ -72,3 +72,5 @@ package-install # then enter 'magit'
 # claude code
 npx @anthropic-ai/claude-code
 
+# uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
