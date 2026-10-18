@@ -67,6 +67,8 @@ def parse_trfile(year):
                 tfo = init_tfo(line)
             elif tfo is not None:  # skip lines if tfo is None (today's incomplete entry)
                 add_to_tfo(tfo, line)
+    if tfo is not None and tfo['date'].date() != datetime.today().date():  # add the file's last day (the loop only adds a day when it sees the next one)
+        trainfos.append(tfo)
     return trainfos
 
 # ----------------------------------------------------------------------------------------
@@ -155,17 +157,30 @@ def plot_acty(actstr):
 
 # ----------------------------------------------------------------------------------------
 helpstr="""
+Plot daily work hours from the '  work' lines in ~/Dropbox/hill/training/<year>/general.txt
+(every year from 2021 to now). Each plot shows the hours for each day, a 7-day average, and a
+31-day average of hrs/week that leaves out vacation and sick days. The overall hrs/week average
+is printed and shown in red at the top right of the plot.
+
+The usual runs (all years, last year, this year) are in ~/trainplots/run.sh, which writes a .jpg
+and a .log for each one to ~/trainplots/. See ~/trainplots/README.
+
+examples:
+trainparse --plotfile ~/trainplots/work-all.jpg                                                   # all years
+trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31 --plotfile ~/trainplots/work-2025.jpg  # one year
 trainparse --debug --start-date 2021-Apr-15 --half-window 7
-trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31
+
+Date lines in general.txt must read '<day> <month> ...', e.g. '15 oct o s'; a missing month crashes
+the parse. Today is skipped, since it is probably not finished.
 """
-parser = argparse.ArgumentParser(description=helpstr)
+parser = argparse.ArgumentParser(description=helpstr, formatter_class=argparse.RawDescriptionHelpFormatter)
 # parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
 # parser.add_argument('--plot', action='store_true')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
 parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.jpg', help='output jpg file name')
-parser.add_argument('--half-window', type=float, default=3.5, help='half width of window for averaging weights')
-parser.add_argument('--weekly-half-window', type=float, default=15, help='half width of window for weekly hours average (default 45.5 = ~3 months)')
+parser.add_argument('--half-window', type=float, default=3.5, help='half width (days) of window for the daily hours average (default 3.5 = the 7-day avg)')
+parser.add_argument('--weekly-half-window', type=float, default=15, help='half width (days) of window for the hrs/week average (default 15 = the 31-day avg)')
 parser.add_argument('--vacation-threshold', type=int, default=3, help='number of zero-hour days in a 7-day window that triggers vacation detection (first 2 zero days in each stretch are treated as normal weekend)')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
