@@ -30,10 +30,11 @@ untimed_activities = [
     'boulder', 'outside-boulder', 'treadwall', 'hangboard-arc', 'pt', 'core', 'pullups', 'plyometrics', 'drive', 'fly',
 ]
 
-# Named sets of activity groups for --activities. Each group gets its own average line.
+# Named sets of activity groups for --activities. Each group gets its own average line. all_label
+# names the line for all groups together (only drawn with more than one group).
 activity_sets = {
-    'work': {'groups': [['work']], 'vacation_threshold': 3, 'weekly_half_window': 15, 'target_hrs_per_week': 40, 'ymax': None},
-    'leg': {'groups': [['run', 'run/walk'], ['hike', 'walk'], ['stairmaster', 'treadmill', 'stairs'], ['ski-tour'], ['bicycle', 'stationary-bike'], ['alpine-climb', 'scramble']],
+    'work': {'groups': [['work']], 'all_label': None, 'vacation_threshold': 3, 'weekly_half_window': 15, 'target_hrs_per_week': 40, 'ymax': None},
+    'leg': {'groups': [['run', 'run/walk'], ['hike', 'walk'], ['stairmaster', 'treadmill', 'stairs'], ['ski-tour'], ['alpine-climb', 'scramble']], 'all_label': 'all foot-based training',
             'vacation_threshold': 0, 'weekly_half_window': 0, 'target_hrs_per_week': None, 'ymax': 6},
 }
 
@@ -216,9 +217,7 @@ def add_per_week_axes(ax):
     ax.tick_params(labelright=True, right=True)
     for side, xpos in [('left', -0.045), ('right', 1.045)]:  # just outside the hours/day labels
         sec = ax.secondary_yaxis(xpos, functions=(lambda y: 7 * y, lambda y: y / 7))
-        sec.set_ylabel('hours/week', color=weekly_color)
-        sec.tick_params(axis='y', labelcolor=weekly_color, color=weekly_color)
-        sec.spines[side].set_color(weekly_color)
+        sec.set_ylabel('hours/week')
 
 # ----------------------------------------------------------------------------------------
 def plot_activities(trainfos):
@@ -249,12 +248,12 @@ def plot_activities(trainfos):
     fig, ax = plt.subplots(figsize=(2500 / dpi, 600 / dpi))
     fig.subplots_adjust(bottom=0.12, left=0.08, right=0.92, top=0.8 if len(args.activities) == 1 else 0.7)
     avg_label = window_label(args.half_window)
-    dots_label = 'all, each day' if len(args.activities) > 1 else 'each day'
+    dots_label = '%s, each day' % args.all_label if len(args.activities) > 1 else 'each day'
     ax.plot(xvals, mfos['total'], linewidth=0, marker='.', markersize=13, alpha=0.6, color=total_color, label=dots_label)
     for igroup, group in enumerate(args.activities):
         ax.plot(xvals, mfos[(igroup, 'avg')], linewidth=3, alpha=0.8, color=group_colors[igroup], label='%s, %s (%.0f h total)' % (group_label(group), avg_label, sum(mfos[igroup])))
     if len(args.activities) > 1:
-        ax.plot(xvals, mfos[('total', 'avg')], linewidth=4, alpha=0.8, color=total_color, label='all, %s' % avg_label)
+        ax.plot(xvals, mfos[('total', 'avg')], linewidth=4, alpha=0.8, color=total_color, label='%s, %s' % (args.all_label, avg_label))
     if 'long_avgs' in mfos:
         ax.plot(xvals, mfos['long_avgs'], linewidth=3, alpha=0.6, color=weekly_color, label=window_label(args.weekly_half_window) + (' (exclud. vac.+sick)' if len(vacation_dates) > 0 else ''))
     if args.target_hrs_per_week is not None:
@@ -262,8 +261,8 @@ def plot_activities(trainfos):
 
     if args.ymax is None:
         ymax = max(mfos['total'] + [1]) * 1.05
-    else:  # same top for every plot, so they can be compared
-        ymax = args.ymax
+    else:  # same top for every plot, so they can be compared; a little extra so dots at <args.ymax> aren't cut off
+        ymax = args.ymax * 1.04
         annotate_clipped_days(ax, mfos, ymax, fsize)
     ax.set_ylim(0, ymax)
     add_per_week_axes(ax)
@@ -304,8 +303,8 @@ together. There is one y axis, in hours/day, labeled on both sides in hours/day 
 (a hours/day average times 7). Vacation detection (work only) shades stretches of zero-hour days
 red and leaves them out of the hrs/week average and the 31-day average.
 
-The usual runs (one per year, 2021 to now) are in ~/trainplots/run.sh, which writes the plots
-and a .log for each to ~/trainplots/, plus index.html showing all years. See ~/trainplots/README.
+The usual runs (work and leg, one plot per year) are in trainparse-run, which writes the plots
+and a .log for each to ~/trainplots/, plus index.html showing all years.
 
 examples:
 trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31 --plotfile ~/trainplots/work-2025.jpg  # work, one year
@@ -325,7 +324,7 @@ tutils.process_args(args)
 check_config()
 aset = activity_sets[args.activities]
 args.activities = aset['groups']  # from here on, the list of groups
-args.vacation_threshold, args.target_hrs_per_week, args.ymax = aset['vacation_threshold'], aset['target_hrs_per_week'], aset['ymax']  # hours/week, hours/day
+args.all_label, args.vacation_threshold, args.target_hrs_per_week, args.ymax = aset['all_label'], aset['vacation_threshold'], aset['target_hrs_per_week'], aset['ymax']  # hours/week, hours/day
 args.weekly_half_window = timedelta(days=aset['weekly_half_window'])  # 0 turns off the long average
 
 if args.start_date is not None and args.start_date.year < first_year:

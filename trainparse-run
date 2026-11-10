@@ -1,0 +1,52 @@
+#!/bin/bash
+# Make trainparse's yearly plots, plus index.html showing them all, newest year first:
+#   work/<year>.jpg  work hours, 2021 (from 12 apr, when this job started) to now
+#   leg/<year>.jpg   leg hours (groups set by activity_sets in trainparse), 2019 to now
+#   <year>.log       trainparse's printout for each plot (vacation+sick stretches, hrs/week average), next to it
+# Any format error in the general.txt files stops every plot; see trainparse --help.
+# Usage: trainparse-run [plot dir (default ~/trainplots)]
+
+outdir="${1:-$HOME/trainplots}"
+mkdir -p "$outdir/work" "$outdir/leg"
+cd "$outdir" || exit 1
+this=$(date +%Y)
+work_years=$(seq $this -1 2021)  # newest first
+leg_years=$(seq $this -1 2019)  # leg plots go back further than work, which wasn't logged before 2021
+
+for year in $work_years; do
+    stop=(--stop-date $year-dec-31); [ $year = $this ] && stop=()
+    start=$year-jan-1; [ $year = 2021 ] && start=2021-apr-12
+    trainparse --start-date $start "${stop[@]}" --plotfile "$PWD/work/$year.jpg" > "work/$year.log" 2>&1 &
+done
+for year in $leg_years; do
+    stop=(--stop-date $year-dec-31); [ $year = $this ] && stop=()
+    trainparse --activities leg --start-date $year-jan-1 "${stop[@]}" --plotfile "$PWD/leg/$year.jpg" > "leg/$year.log" 2>&1 &
+done
+wait
+
+failed=0
+for log in work/*.log leg/*.log; do
+    if ! grep -q 'hrs/week average' "$log"; then
+        echo "$outdir/$log: trainparse failed:"; tail -20 "$log"; failed=1; break
+    fi
+done
+[ $failed = 1 ] && exit 1
+for year in $work_years; do echo "work-$year: $(grep 'hrs/week average' work/$year.log | sed 's/^ *//')"; done
+for year in $leg_years; do echo "leg-$year: $(grep 'hrs/week average' leg/$year.log | sed 's/^ *//')"; done
+
+{
+    echo '<!doctype html><html><head><meta charset="utf-8"><title>Training time</title>'
+    echo '<style>body{font-family:sans-serif;margin:16px;background:#fff;color:#222} img{width:100%;height:auto} h2{margin:28px 0 4px} p{margin:2px 0}</style></head><body>'
+    echo "<h1>Training time</h1><p>Made $(date '+%Y-%m-%d %H:%M') by ~/bin/trainparse-run.</p>"
+    for year in $leg_years; do
+        echo "<h2>$year</h2>"
+        if echo "$work_years" | grep -qx $year; then
+            echo "<p>work: $(grep 'hrs/week average' work/$year.log | sed 's/^ *//')</p>"
+            echo "<img src=\"work/$year.jpg\" alt=\"work hours $year\">"
+        fi
+        echo "<p>leg: $(grep 'hrs/week average' leg/$year.log | sed 's/^ *//')</p>"
+        echo "<img src=\"leg/$year.jpg\" alt=\"leg hours $year\">"
+    done
+    echo '</body></html>'
+} > index.html
+echo "wrote $outdir/index.html"
