@@ -1,12 +1,10 @@
 #!/bin/bash
+# The sleep hook /usr/lib/systemd/system-sleep/fuse-sleep disconnects ~/gdrive and ~/fh for every suspend and hibernate.
 if [ `hostname` == "glorax" ]; then
     dropbox stop
     fhumount -z
     echo "suspending (need to set up hibernate)"
     sudo systemctl suspend
 else
-    fhumount -z
-    # flush caches to maybe keep hibernate from failing:
-    sync && echo 3 | sudo tee /proc/sys/vm/drop_caches
     sudo systemctl hibernate
 fi

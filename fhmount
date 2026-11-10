@@ -22,8 +22,8 @@ if [ "$(hostname)" = "thneed" ]; then
 fi
 
 # need to kill any existing sshfs processes, since they can cause e.g. firefox to hang if the internet connections is dodgy
-pps | grep sshfs | grep -v grep | grep ' dralph '
-for pid in `pps | grep sshfs | grep -v grep | grep ' dralph ' | ap 8`; do
+pps | grep sshfs | grep -v grep | grep " $USER "
+for pid in `pps | grep sshfs | grep -v grep | grep " $USER " | ap 8`; do
     echo "killing running sshfs process $pid"
     kill -9 $pid
 done
@@ -36,5 +36,5 @@ fusermount -uz "$MNT" 2>/dev/null
 # ServerAlive* makes a silently-dead SSH link (sleep/wifi blip/VPN/idle-timeout) get detected in
 # ~45s, so the mount FAILS FAST (ENOTCONN, like "not found") instead of hanging firefox/everything
 # forever. NOT using 'reconnect' (that's what caused runaway ssh on oubli — keepalive alone is safe).
-sshfs -o allow_other,default_permissions,uid=1000,gid=1000,ServerAliveInterval=15,ServerAliveCountMax=3 ermine:/fh/fast/matsen_e "$MNT" -C
+sshfs -o allow_other,default_permissions,uid=1000,gid=1000,ServerAliveInterval=15,ServerAliveCountMax=3 thneed:/fh/fast/matsen_e "$MNT" -C
 # verbose/debug option: -o debug,
