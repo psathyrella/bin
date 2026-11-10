@@ -39,8 +39,8 @@ activity_sets = {
 }
 
 group_colors = ['#2a78d6', '#eb6834', '#2e9e5b', '#c8a020', '#17a2b8', '#a0522d']  # blue/orange as in hangplot
-total_color = 'dimgrey'
-weekly_color = '#8e44ad'
+total_color = '#8e44ad'  # each day's dots, and the hours/day axes they're read on
+weekly_color = 'dimgrey'  # all groups' 7-day avg, and work's 31-day avg and 40 hrs/week line
 
 # ----------------------------------------------------------------------------------------
 def check_config():
@@ -200,8 +200,9 @@ def build_series(tfos):
     return mfos
 
 # ----------------------------------------------------------------------------------------
-def annotate_clipped_days(ax, mfos, ymax, fsize):
-    """Write the hours of each day above <ymax> along the top of the plot, stepping down a row when the previous label is close."""
+def annotate_clipped_days(ax, mfos, ymax, fsize, cap):
+    """Write the hours of each day above <ymax> along the top of the plot, stepping down a row when
+    the previous label is close, and add a legend entry saying what the numbers are."""
     last_dt, ilevel = None, 0
     for dt, tot in zip(mfos['dates'], mfos['total']):
         if tot <= ymax:
@@ -209,15 +210,24 @@ def annotate_clipped_days(ax, mfos, ymax, fsize):
         ilevel = ilevel + 1 if last_dt is not None and (dt - last_dt).days < 6 else 0
         ax.annotate('%d' % round(tot), (dt, ymax), textcoords='offset points', xytext=(0, -14 * (1 + ilevel % 3)), ha='center', fontsize=fsize - 6, color=total_color)
         last_dt = dt
+    if last_dt is not None:
+        ax.plot([], [], linewidth=0, marker='$12$', markersize=fsize - 4, color=total_color, label='hours on a day above %g h/day (off the top)' % cap)
 
 # ----------------------------------------------------------------------------------------
-def add_per_week_axes(ax):
-    """The plot's one y axis is in hours/day; label each side also in hours/week (an average in hours/day times 7)."""
-    ax.set_ylabel('hours/day')
-    ax.tick_params(labelright=True, right=True)
-    for side, xpos in [('left', -0.045), ('right', 1.045)]:  # just outside the hours/day labels
-        sec = ax.secondary_yaxis(xpos, functions=(lambda y: 7 * y, lambda y: y / 7))
-        sec.set_ylabel('hours/week')
+def add_axes(ax, ymax):
+    """Everything is plotted in hours/day. The inner axis on each side (with the gridlines) is labeled
+    in hours/week, for the lines (all averages); the outer one in hours/day, in the dots' color, for the dots (single days)."""
+    step = 10 if ymax * 7 <= 70 else 20
+    per_week = list(range(0, int(ymax * 7) + 1, step))
+    ax.set_yticks([w / 7 for w in per_week])
+    ax.set_yticklabels(['%d' % w for w in per_week])
+    ax.set_ylabel('hours/week (lines)')
+    ax.tick_params(axis='y', labelright=True, right=True)
+    for side, xpos in [('left', -0.045), ('right', 1.045)]:  # just outside the hours/week labels
+        sec = ax.secondary_yaxis(xpos, functions=(lambda y: y, lambda y: y))
+        sec.set_ylabel('hours/day (dots)', color=total_color)
+        sec.tick_params(axis='y', labelcolor=total_color, color=total_color)
+        sec.spines[side].set_color(total_color)
 
 # ----------------------------------------------------------------------------------------
 def plot_activities(trainfos):
@@ -251,31 +261,38 @@ def plot_activities(trainfos):
     dots_label = '%s, each day' % args.all_label if len(args.activities) > 1 else 'each day'
     ax.plot(xvals, mfos['total'], linewidth=0, marker='.', markersize=13, alpha=0.6, color=total_color, label=dots_label)
     for igroup, group in enumerate(args.activities):
-        ax.plot(xvals, mfos[(igroup, 'avg')], linewidth=3, alpha=0.8, color=group_colors[igroup], label='%s, %s (%.0f h total)' % (group_label(group), avg_label, sum(mfos[igroup])))
+        if sum(mfos[igroup]) == 0:  # nothing to show, so leave it out of the legend too
+            continue
+        ax.plot(xvals, mfos[(igroup, 'avg')], linewidth=3, alpha=0.6, color=group_colors[igroup], label='%s, %s (%.0f h total)' % (group_label(group), avg_label, sum(mfos[igroup])))
     if len(args.activities) > 1:
-        ax.plot(xvals, mfos[('total', 'avg')], linewidth=4, alpha=0.8, color=total_color, label='%s, %s' % (args.all_label, avg_label))
+        ax.plot(xvals, mfos[('total', 'avg')], linewidth=4, alpha=0.6, color=weekly_color, label='%s, %s (%.0f h total)' % (args.all_label, avg_label, sum(mfos['total'])))
     if 'long_avgs' in mfos:
-        ax.plot(xvals, mfos['long_avgs'], linewidth=3, alpha=0.6, color=weekly_color, label=window_label(args.weekly_half_window) + (' (exclud. vac.+sick)' if len(vacation_dates) > 0 else ''))
+        ax.plot(xvals, mfos['long_avgs'], linewidth=3, alpha=0.45, color=weekly_color, label=window_label(args.weekly_half_window) + (' (exclud. vac.+sick)' if len(vacation_dates) > 0 else ''))
     if args.target_hrs_per_week is not None:
-        ax.axhline(y=args.target_hrs_per_week / 7, color=weekly_color, linestyle='--', alpha=0.5, linewidth=3)
+        ax.axhline(y=args.target_hrs_per_week / 7, color=weekly_color, linestyle='--', alpha=0.4, linewidth=3)
 
     if args.ymax is None:
         ymax = max(mfos['total'] + [1]) * 1.05
     else:  # same top for every plot, so they can be compared; a little extra so dots at <args.ymax> aren't cut off
         ymax = args.ymax * 1.04
-        annotate_clipped_days(ax, mfos, ymax, fsize)
+        annotate_clipped_days(ax, mfos, ymax, fsize, args.ymax)
     ax.set_ylim(0, ymax)
-    add_per_week_axes(ax)
+    add_axes(ax, ymax)
 
     ax.set_xlim(xvals[0] - timedelta(days=2), max(xvals[-1], args.stop_date or xvals[-1]) + timedelta(days=2))  # through --stop-date, so a year in progress is drawn at full-year scale
     ax.xaxis.set_major_locator(mpl.dates.MonthLocator() if (xvals[-1] - xvals[0]).days < 500 else mpl.dates.MonthLocator(bymonth=range(1, 13, 2)))
     ax.xaxis.set_major_formatter(mpl.dates.DateFormatter('%b'))
     ax.grid(axis='y')
     titlestr = '%d' % xvals[0].year if xvals[0].year == xvals[-1].year else '%s to %s' % (xvals[0].date(), xvals[-1].date())
-    titlestr += '   (%.1f hrs/week avg%s)' % (avg_hrs_per_week, ', exclud. %d vac.+sick days' % len(vacation_dates) if len(vacation_dates) > 0 else '')
+    titlestr += '   (%.1f hrs/week avg, %.0f h total%s)' % (avg_hrs_per_week, sum(mfos['total']), ', exclud. %d vac.+sick days' % len(vacation_dates) if len(vacation_dates) > 0 else '')
     n_legend_rows = 1 if len(args.activities) == 1 else 3
     ax.set_title(titlestr, fontweight='bold', pad=10 + 25 * n_legend_rows)
-    ax.legend(loc='lower left', bbox_to_anchor=(0, 1.0), ncol=4 if n_legend_rows == 1 else 3, frameon=False)
+    handles, labels = ax.get_legend_handles_labels()
+    if len(args.activities) > 1:  # all groups' 7-day avg goes right after the dots, since it's the sum of the dots
+        itot = [i for i, l in enumerate(labels) if l.startswith('%s, %s' % (args.all_label, avg_label))][0]
+        handles.insert(1, handles.pop(itot))
+        labels.insert(1, labels.pop(itot))
+    ax.legend(handles, labels, loc='lower left', bbox_to_anchor=(0, 1.0), ncol=4 if n_legend_rows == 1 else 3, frameon=False)
     for s, e in date_spans(vacation_dates):
         ax.axvspan(s - timedelta(hours=12), e + timedelta(hours=12), alpha=0.15, color='red')
 
@@ -299,8 +316,9 @@ and line number, and nothing is plotted. Today's lines aren't read, since it's p
 --activities names one of activity_sets (at the top of this script), which lists its groups of
 activities and its plot settings. Each group gets its own 7-day average line; with more than one
 group there is also a line for all groups together. The dots are each day's hours for all groups
-together. There is one y axis, in hours/day, labeled on both sides in hours/day and in hours/week
-(a hours/day average times 7). Vacation detection (work only) shades stretches of zero-hour days
+together. There is one y axis, labeled twice on each side: the inner labels (with the gridlines)
+in hours/week, for the lines, which are all averages; the outer purple labels in hours/day, for the
+dots, which are single days. Vacation detection (work only) shades stretches of zero-hour days
 red and leaves them out of the hrs/week average and the 31-day average.
 
 The usual runs (work and leg, one plot per year) are in trainparse-run, which writes the plots
