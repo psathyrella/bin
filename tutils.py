@@ -1,5 +1,4 @@
 import sys
-import numpy
 import traceback
 from datetime import datetime, timedelta
 import calendar
@@ -94,7 +93,8 @@ def add_float_averages(mfos, yvar, half_window, output_key='float_avgs', debug=F
         last_dtime = dtime
 
 # ----------------------------------------------------------------------------------------
-def plot_mfos(args, mfos, yvar, end_date=None, tickday=1, vacation_dates=None, avg_hrs_per_week=None):
+def plot_mfos(args, mfos, yvar, end_date=None, tickday=1):
+    """Weight plot for mappend (trainparse does its own plotting)."""
     if end_date is None:
         end_date = mfos['dates'][-1]
     xticks, xticklabels = [], []
@@ -138,51 +138,12 @@ def plot_mfos(args, mfos, yvar, end_date=None, tickday=1, vacation_dates=None, a
 
     ax.plot(mfos['n_days'], mfos[yvar], linewidth=0, alpha=0.7, markersize=15, marker='.', label=yvar)
     ax.plot(mfos['n_days'], mfos['float_avgs'], linewidth=3, alpha=0.6, label='%d-day avg' % (2 * args.half_window.days + 1))
-    if yvar == 'weights':
-        ax.set_ylabel('weight')
-    else:
-        ax.axhline(y=5.7, color='tab:orange', linestyle='--', alpha=0.5, linewidth=3)
-        ax.set_ylabel('hours/day')
-        ax.set_ylim(bottom=0)
-
-    if 'weekly_avgs' in mfos:
-        ax2 = ax.twinx()
-        ax2.plot(mfos['n_days'], mfos['weekly_avgs'], linewidth=3, alpha=0.6, color='green', label='%d-day avg hrs/week (exclud. vac.+sick)' % (2 * args.weekly_half_window.days + 1))
-        ax2.axhline(y=40, color='green', linestyle='--', alpha=0.5, linewidth=3)
-        weekly_max = max(v for v in mfos['weekly_avgs'] if not numpy.isnan(v))
-        ax2.set_ylim(0, weekly_max * 1.15)
-        ax2.set_ylabel('hours/week', color='green')
-        ax2.tick_params(axis='y', labelcolor='green')
+    ax.set_ylabel('weight')
 
     plt.xticks(xticks)
     ax.grid(axis='y')
     ax.set_xticklabels(xticklabels, rotation='vertical')
-    lines1, labels1 = ax.get_legend_handles_labels()
-    lines2, labels2 = (ax2.get_legend_handles_labels() if 'weekly_avgs' in mfos else ([], []))
-    ax.legend(lines1 + lines2, labels1 + labels2, loc='upper left', bbox_to_anchor=(0, 1.15), ncol=len(lines1) + len(lines2))
-
-    if vacation_dates:
-        # group contiguous vacation dates into spans and shade them
-        sorted_vdates = sorted(vacation_dates)
-        spans = []
-        span_start = sorted_vdates[0]
-        span_end = sorted_vdates[0]
-        for vd in sorted_vdates[1:]:
-            if (vd - span_end).days <= 1:
-                span_end = vd
-            else:
-                spans.append((span_start, span_end))
-                span_start = vd
-                span_end = vd
-        spans.append((span_start, span_end))
-        for s, e in spans:
-            x0 = (s - args.start_date).days - 0.5
-            x1 = (e - args.start_date).days + 0.5
-            ax.axvspan(x0, x1, alpha=0.15, color='red')
-        vac_str = '%d vacation+sick days' % len(sorted_vdates)
-        if avg_hrs_per_week is not None:
-            vac_str = '%.1f hrs/week avg (exclud. vac.+sick),  %s' % (avg_hrs_per_week, vac_str)
-        ax.text(0.98, 1.04, vac_str, transform=ax.transAxes, ha='right', va='bottom', fontsize=18, color='red')
+    ax.legend(loc='upper left', bbox_to_anchor=(0, 1.15), ncol=2)
 
     plt.savefig(args.plotfile)
 

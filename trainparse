@@ -1,136 +1,150 @@
 #!/usr/bin/env python
-import sys
-import csv
 import argparse
-import os
-from datetime import datetime, timedelta
 import calendar
+import os
+import re
+from datetime import datetime, timedelta
+
 import colored_traceback.always
-# import imp
 
 import tutils
 
-base_path = '%s/Dropbox/hill/training' % os.getenv('HOME')
+first_year = 2019  # 2018 puts the time before the activity name ('0:40 flat run'), which parse_trfile() doesn't read
+
+# Every activity name allowed as the first word of an indented line in general.txt. Anything
+# else is an error. A time is 'h:mm', 'hmm' or 'h' ('1:15', '115', '1'). For timed_activities the
+# second word must be a time. For optional_time_activities a time as the second word is counted,
+# and a line without one is skipped (e.g. 'scramble 300m': its time is in that day's hike line).
+# For untimed_activities anything can follow the name.
+timed_activities = [
+    'work',
+    'run', 'run/walk', 'hike', 'walk', 'stairmaster', 'treadmill', 'stairs', 'ski-tour', 'resort-ski', 'bicycle', 'stationary-bike', 'elliptical', 'crutch',
+    'lockoffs', 'pick-ups', 'jug/clean', 'finger-pt',
+    'sbp-boulder', 'sbp', 'sbp-arc', 'gym-boulder', 'gym-autobelay', 'hangboard', 'hb-max',
+    'route-prep', 'scrub', 'kayak', 'snow-blow',
+]
+optional_time_activities = ['alpine-climb', 'scramble']
+untimed_activities = [
+    'note:', 'injury:', 'lesson:', 'strength',
+    'rock-climb', 'gym-climb', 'climb', 'ice-climb', 'drytool', 'm-climb', 'mixed-climb', 'crampon-climb', 'aid-climb',
+    'boulder', 'outside-boulder', 'treadwall', 'hangboard-arc', 'pt', 'core', 'pullups', 'plyometrics', 'drive', 'fly',
+]
+
+# Named sets of activity groups for --activities. Each group gets its own average line.
+activity_sets = {
+    'work': {'groups': [['work']], 'vacation_threshold': 3, 'weekly_half_window': 15, 'target_hrs_per_week': 40, 'ymax': None},
+    'leg': {'groups': [['run', 'run/walk'], ['hike', 'walk'], ['stairmaster', 'treadmill', 'stairs'], ['ski-tour'], ['bicycle', 'stationary-bike'], ['alpine-climb', 'scramble']],
+            'vacation_threshold': 0, 'weekly_half_window': 0, 'target_hrs_per_week': None, 'ymax': 6},
+}
+
+group_colors = ['#2a78d6', '#eb6834', '#2e9e5b', '#c8a020', '#17a2b8', '#a0522d']  # blue/orange as in hangplot
+total_color = 'dimgrey'
+weekly_color = '#8e44ad'
+
+# ----------------------------------------------------------------------------------------
+def check_config():
+    all_names = timed_activities + optional_time_activities + untimed_activities
+    if len(set(all_names)) != len(all_names):
+        raise Exception('activity names listed twice in timed_activities/optional_time_activities/untimed_activities')
+    for sname, sfo in activity_sets.items():
+        unknown = [a for g in sfo['groups'] for a in g if a not in timed_activities + optional_time_activities]
+        if len(unknown) > 0:
+            raise Exception('activity set \'%s\' has names not in timed_activities or optional_time_activities: %s' % (sname, ' '.join(unknown)))
+        if len(sfo['groups']) > len(group_colors):
+            raise Exception('activity set \'%s\' has %d groups, but there are only %d colors' % (sname, len(sfo['groups']), len(group_colors)))
 
 # ----------------------------------------------------------------------------------------
 def trfname(year):
-    return '%s/%d/general.txt' % (base_path, year)
+    return '%s/%d/general.txt' % (args.training_dir, year)
 
 # ----------------------------------------------------------------------------------------
-def parse_trfile(year):
-    # ----------------------------------------------------------------------------------------
-    def init_tfo(line):
-        tfo = {}
-        lstrs = line.split()
-        try:
-            day = int(lstrs[0])
-        except:
-            raise Exception('couldn\'t parse day from \'%s\'' % line)
-        month = lstrs[1].capitalize() if len(lstrs) > 1 else None
-        if month not in calendar.month_abbr:
-            raise Exception('couldn\'t parse month from \'%s\'' % line)
-        tfo['date'] = datetime(year=year, month=list(calendar.month_abbr).index(month), day=day)
-        if len(lstrs) < 3:
-            if tfo['date'].date() == datetime.today().date():
-                return None  # skip today since it's probably not complete
-            else:
-                raise Exception('date line must be len at least 3 but got %d for line \'%s\'' % (len(lstrs), line))
-        tfo['xo'] = lstrs[2]
-        return tfo
-    # ----------------------------------------------------------------------------------------
-    def add_to_tfo(tfo, line):
-        if tfo['date'].date() == datetime.today().date():  # skip today since it's probably not complete
-            return
-        if line[:2] != '  ':
-            raise Exception('first two chars must be spaces but got \'%s\' in:\n%s' % (line[:2], line))
-        lstrs = line.split()
-        activity = lstrs[0]
-        tfo[activity] = {}
-        if activity == 'work':
-            tfo[activity]['hours'] = tutils.parsetime(lstrs[1])
-            if tfo[activity]['hours'] is None:
-                print('    couldn\'t parse time for %s: \'%s\'' % (str(tfo['date']), line))
-        else:
-            tfo[activity]['line'] = line
-    # ----------------------------------------------------------------------------------------
-    trainfos = []
+def parse_hours(tstr):
+    """Hours from <tstr>, or None if it isn't a time: 'h:mm', 'hmm' or 'h' (e.g. '8:15', '815', '8')."""
+    tmatch = re.match(r'^(\d+):([0-5]\d)$', tstr)
+    if tmatch is not None:
+        return int(tmatch.group(1)) + int(tmatch.group(2)) / 60.
+    if re.match(r'^(\d{1,2}|\d{1,2}[0-5]\d)$', tstr):
+        return tutils.parsetime(tstr)
+    return None
+
+# ----------------------------------------------------------------------------------------
+def parse_trfile(year, errors):
+    """Return a list with one entry per day before today (today is probably not finished, so its
+    lines aren't read): {'date': datetime, 'acts': {activity: hours}}, where the hours of all of a
+    day's lines for one activity are added together. Appends a message to <errors> for each line
+    that breaks the format."""
+    trainfos, tfo, skipping = [], None, False
     print('      parsing %s' % trfname(year))
     with open(trfname(year)) as tfile:
-        tfo = None
-        for line in tfile:
+        for iline, line in enumerate(tfile, start=1):
             line = line.rstrip('\n')
-            if not line:
+            def err(msg):
+                errors.append('%s:%d: %s:  \'%s\'' % (trfname(year), iline, msg, line))
+            expected = datetime(year, 1, 1) if len(trainfos) == 0 else trainfos[-1]['date'] + timedelta(days=1)
+            today = datetime.today()
+            if year == today.year and re.match(r'^%d %s( |$)' % (today.day, today.strftime('%b').lower()), line):  # today is usually unfinished, so nothing from its date line on is checked
+                if expected.date() != today.date():
+                    err('expected %s' % expected.strftime('%-d %b').lower())
+                skipping = True
                 continue
-            if line[0] != ' ':  # new day
-                if tfo is not None and tfo['date'].date() != datetime.today().date():  # add the last day to <trainfos> (skip today since it's probably not complete)
-                    trainfos.append(tfo)
-                tfo = init_tfo(line)
-            elif tfo is not None:  # skip lines if tfo is None (today's incomplete entry)
-                add_to_tfo(tfo, line)
-    if tfo is not None and tfo['date'].date() != datetime.today().date():  # add the file's last day (the loop only adds a day when it sees the next one)
-        trainfos.append(tfo)
+            dmatch = re.match(r'^(\d{1,2}) ([a-z]{3})( (x|x-|o)( (n|s))?)?$', line)
+            if dmatch is not None:  # new day
+                month = dmatch.group(2).capitalize()
+                if month not in calendar.month_abbr:
+                    err('bad month')
+                    continue
+                try:
+                    date = datetime(year=year, month=list(calendar.month_abbr).index(month), day=int(dmatch.group(1)))
+                except ValueError as exc:
+                    err(str(exc))
+                    continue
+                if dmatch.group(3) is None:
+                    err('date line needs x, x- or o after the month')
+                if date != expected:
+                    err('expected %s' % expected.strftime('%-d %b').lower())
+                if date.date() > today.date():
+                    err('date is in the future')
+                tfo = {'date': date, 'acts': {}}
+                trainfos.append(tfo)
+                continue
+            if skipping:
+                continue
+            if tfo is None:
+                err('line before the first date line')
+                continue
+            if re.match(r'^  \S', line) is None:
+                err('not a date line (\'<day> <mon> <x|x-|o> [n|s]\') or an activity line (two spaces, then the activity)')
+                continue
+            lstrs = line.split()
+            activity = lstrs[0]
+            if activity in timed_activities or activity in optional_time_activities:
+                hours = parse_hours(lstrs[1]) if len(lstrs) > 1 else None
+                if hours is None:
+                    if activity in timed_activities:
+                        err('\'%s\' needs a time (h:mm, hmm or h) as its second word' % activity)
+                    elif len(lstrs) > 1 and re.match(r'^\d+:', lstrs[1]):
+                        err('second word looks like a time but isn\'t one')
+                    continue
+                tfo['acts'][activity] = tfo['acts'].get(activity, 0.) + hours
+            elif activity not in untimed_activities:
+                err('unknown activity \'%s\' (add it to timed_activities, optional_time_activities or untimed_activities in trainparse if it\'s real)' % activity)
+    if len(trainfos) > 0 and year < datetime.today().year and trainfos[-1]['date'] != datetime(year, 12, 31):
+        errors.append('%s: last day is %s, not 31 dec' % (trfname(year), trainfos[-1]['date'].date()))
     return trainfos
 
 # ----------------------------------------------------------------------------------------
-def get_n_week_time(trainfos, actstr, n_weeks):
-    # prev_time = datetime.now() - timedelta(weeks=n_weeks)
-    dtnow = datetime.now() - timedelta(days=1)  # go back to yesterday, since presumably we haven't finished writing today yet
-    target_date = dtnow - timedelta(weeks=n_weeks)
-    n_nonzero_days, n_total_days, time_total, earliest_date = 0, 0, 0, None
-    for tfo in reversed(trainfos):
-        if tfo['date'] < target_date:
-            break
-        if earliest_date is None or tfo['date'] < earliest_date:
-            earliest_date = tfo['date']
-        n_total_days += 1
-        if actstr not in tfo:
-            continue
-        n_nonzero_days += 1
-        time_total += tfo[actstr]['hours']
-    if earliest_date > target_date:
-        print('  warning: earliest found date %s later than target date %s' % (str(earliest_date), str(target_date)))
-    print('    %d hours of %s (%.1f per week) over %d days (%d non-zero) from %s %s to %s %s' % (time_total, actstr, time_total / n_weeks, n_total_days, n_nonzero_days, calendar.month_abbr[earliest_date.month], earliest_date.day, calendar.month_abbr[dtnow.month], dtnow.day))
-
-# ----------------------------------------------------------------------------------------
-def plot_acty(actstr):
-    print('    plotting activity \'work\'')
-    mfos = {'dates' : [], 'hours' : [], 'n_days' : []}
-    for tfo in trainfos:
-        if args.start_date is None:
-            args.start_date = tfo['date']
-        elif args.start_date > tfo['date']:
-            continue
-        if args.stop_date is not None and tfo['date'] > args.stop_date:
-            break
-        mfos['dates'].append(tfo['date'])
-        hour_str = tfo.get(actstr, {'hours' : 0})['hours']
-        if hour_str is None:
-            raise Exception('None type hour str for %s' % tfo['date'])
-        mfos['hours'].append(float(hour_str))
-        mfos['n_days'].append((tfo['date'] - args.start_date).days)
-    if len(mfos['dates']) == 0:
-        raise Exception('no dates passing start date %s' % args.start_date)
-
-    # validate that every calendar day has an entry
-    for i in range(1, len(mfos['dates'])):
-        gap = (mfos['dates'][i] - mfos['dates'][i-1]).days
-        if gap != 1:
-            raise Exception('missing %d day(s) between %s and %s' % (gap - 1, mfos['dates'][i-1].date(), mfos['dates'][i].date()))
-
-    # detect vacation periods using sliding 7-day window density
-    vacation_dates = set()
-    zero_days = [i for i, hrs in enumerate(mfos['hours']) if hrs == 0]
-    # mark zero-hour days where the 7-day centered window has >= threshold zero days
+def find_vacation_dates(dates, hours, threshold):
+    """Zero-hour days where a centered 7-day window has at least <threshold> zero-hour days,
+    except the first two of each stretch (treated as a normal weekend)."""
     candidates = set()
-    for i in zero_days:
-        window_start = max(0, i - 3)
-        window_end = min(len(mfos['hours']), i + 4)  # exclusive
-        n_zeros = sum(1 for j in range(window_start, window_end) if mfos['hours'][j] == 0)
-        if n_zeros >= args.vacation_threshold:
+    for i, hrs in enumerate(hours):
+        if hrs != 0:
+            continue
+        n_zeros = sum(1 for j in range(max(0, i - 3), min(len(hours), i + 4)) if hours[j] == 0)
+        if n_zeros >= threshold:
             candidates.add(i)
-    # group candidates into stretches (allow gaps up to 3 days, matching window half-width); exempt first 2 per stretch
-    stretches = []
-    cur_stretch = []
+    # group candidates into stretches (allow gaps up to 3 days, matching window half-width)
+    stretches, cur_stretch = [], []
     for i in sorted(candidates):
         if cur_stretch and (i > cur_stretch[-1] + 3 or i - cur_stretch[0] >= 7):  # cap stretch at 7 days (if it's longer we want to start a new stretch so two new 'weekend' days get excluded)
             stretches.append(cur_stretch)
@@ -138,57 +152,189 @@ def plot_acty(actstr):
         cur_stretch.append(i)
     if cur_stretch:
         stretches.append(cur_stretch)
+    vacation_dates = set()
     for stretch in stretches:
-        for idx in stretch[2:]:  # first 2 are treated as normal weekend
-            vacation_dates.add(mfos['dates'][idx])
+        for idx in stretch[2:]:
+            vacation_dates.add(dates[idx])
         if len(stretch) > 2:
-            print('      %d vacation+sick days in %d-day stretch: %s - %s'
-                  % (len(stretch) - 2, len(stretch), mfos['dates'][stretch[2]].date(), mfos['dates'][stretch[-1]].date()))
-
-    n_non_vacation = len(mfos['dates']) - len(vacation_dates)
-    total_hours = sum(h for d, h in zip(mfos['dates'], mfos['hours']) if d not in vacation_dates)
-    avg_hrs_per_week = total_hours / n_non_vacation * 7 if n_non_vacation > 0 else 0
-    print('    %.1f hrs/week average (%d vacation+sick days excluded)' % (avg_hrs_per_week, len(vacation_dates)))
-
-    tutils.add_float_averages(mfos, 'hours', args.half_window, debug=args.debug)
-    tutils.add_float_averages(mfos, 'hours', args.weekly_half_window, output_key='weekly_avgs', exclude_dates=vacation_dates)
-    mfos['weekly_avgs'] = [float('nan') if d in vacation_dates else v * 7 for d, v in zip(mfos['dates'], mfos['weekly_avgs'])]
-    tutils.plot_mfos(args, mfos, 'hours', vacation_dates=vacation_dates, avg_hrs_per_week=avg_hrs_per_week)
+            print('      %d vacation+sick days in %d-day stretch: %s - %s' % (len(stretch) - 2, len(stretch), dates[stretch[2]].date(), dates[stretch[-1]].date()))
+    return vacation_dates
 
 # ----------------------------------------------------------------------------------------
-helpstr="""
-Plot daily work hours from the '  work' lines in ~/Dropbox/hill/training/<year>/general.txt
-(every year from 2021 to now). Each plot shows the hours for each day, a 7-day average, and a
-31-day average of hrs/week that leaves out vacation and sick days. The overall hrs/week average
-is printed and shown in red at the top right of the plot.
+def date_spans(dates):
+    """Group <dates> into (first, last) runs of consecutive days."""
+    spans = []
+    for dt in sorted(dates):
+        if len(spans) > 0 and (dt - spans[-1][1]).days <= 1:
+            spans[-1][1] = dt
+        else:
+            spans.append([dt, dt])
+    return spans
 
-The usual runs (all years, last year, this year) are in ~/trainplots/run.sh, which writes a .jpg
-and a .log for each one to ~/trainplots/. See ~/trainplots/README.
+# ----------------------------------------------------------------------------------------
+def group_label(group):
+    return ' + '.join(group)
+
+# ----------------------------------------------------------------------------------------
+def window_label(half_window):
+    return '%d-day avg' % (2 * int(half_window.total_seconds() // 86400) + 1)  # the whole days within <half_window> on each side, plus the day itself
+
+# ----------------------------------------------------------------------------------------
+def select_days(trainfos):
+    """The days between --start-date and --stop-date (parse_trfile() has already checked that no day is missing or repeated)."""
+    tfos = [t for t in trainfos if t['date'] >= args.start_date and (args.stop_date is None or t['date'] <= args.stop_date)]
+    if len(tfos) == 0:
+        raise Exception('no dates between --start-date %s and --stop-date %s' % (args.start_date, args.stop_date))
+    return tfos
+
+# ----------------------------------------------------------------------------------------
+def build_series(tfos):
+    """Daily hours for each group (keys 0, 1, ...) and for all groups together ('total'), plus their averages."""
+    mfos = {'dates': [t['date'] for t in tfos]}
+    for igroup, group in enumerate(args.activities):
+        mfos[igroup] = [sum(t['acts'].get(a, 0.) for a in group) for t in tfos]
+    mfos['total'] = [sum(vals) for vals in zip(*(mfos[ig] for ig in range(len(args.activities))))]
+    for key in list(range(len(args.activities))) + ['total']:
+        tutils.add_float_averages(mfos, key, args.half_window, output_key=(key, 'avg'), debug=args.debug and key == 'total')
+    return mfos
+
+# ----------------------------------------------------------------------------------------
+def annotate_clipped_days(ax, mfos, ymax, fsize):
+    """Write the hours of each day above <ymax> along the top of the plot, stepping down a row when the previous label is close."""
+    last_dt, ilevel = None, 0
+    for dt, tot in zip(mfos['dates'], mfos['total']):
+        if tot <= ymax:
+            continue
+        ilevel = ilevel + 1 if last_dt is not None and (dt - last_dt).days < 6 else 0
+        ax.annotate('%d' % round(tot), (dt, ymax), textcoords='offset points', xytext=(0, -14 * (1 + ilevel % 3)), ha='center', fontsize=fsize - 6, color=total_color)
+        last_dt = dt
+
+# ----------------------------------------------------------------------------------------
+def add_per_week_axes(ax):
+    """The plot's one y axis is in hours/day; label each side also in hours/week (an average in hours/day times 7)."""
+    ax.set_ylabel('hours/day')
+    ax.tick_params(labelright=True, right=True)
+    for side, xpos in [('left', -0.045), ('right', 1.045)]:  # just outside the hours/day labels
+        sec = ax.secondary_yaxis(xpos, functions=(lambda y: 7 * y, lambda y: y / 7))
+        sec.set_ylabel('hours/week', color=weekly_color)
+        sec.tick_params(axis='y', labelcolor=weekly_color, color=weekly_color)
+        sec.spines[side].set_color(weekly_color)
+
+# ----------------------------------------------------------------------------------------
+def plot_activities(trainfos):
+    print('    plotting %s' % '  |  '.join(group_label(g) for g in args.activities))
+    mfos = build_series(select_days(trainfos))
+    xvals = mfos['dates']
+
+    vacation_dates = find_vacation_dates(xvals, mfos['total'], args.vacation_threshold) if args.vacation_threshold > 0 else set()
+    n_counted = len(xvals) - len(vacation_dates)
+    avg_hrs_per_week = sum(h for d, h in zip(xvals, mfos['total']) if d not in vacation_dates) / n_counted * 7 if n_counted > 0 else 0
+    vacation_str = ' (%d vacation+sick days excluded)' % len(vacation_dates) if args.vacation_threshold > 0 else ''
+    print('    %.1f hrs/week average%s' % (avg_hrs_per_week, vacation_str))
+    if args.weekly_half_window > timedelta(0):
+        tutils.add_float_averages(mfos, 'total', args.weekly_half_window, output_key='long_avgs', exclude_dates=vacation_dates)
+        mfos['long_avgs'] = [float('nan') if d in vacation_dates else v for d, v in zip(xvals, mfos['long_avgs'])]
+
+    import matplotlib as mpl  # imported here since it's slow, and mpl.use() has to come before pyplot
+    mpl.use('Agg')
+    mpl.rcParams['svg.fonttype'] = 'none'
+    mpl.rcParams['svg.hashsalt'] = 'trainparse'  # so two runs give byte-identical svgs
+    import matplotlib.pyplot as plt
+    import seaborn
+    seaborn.set_style('ticks')
+    fsize = 20
+    mpl.rcParams.update({'legend.fontsize': fsize - 4, 'axes.titlesize': fsize, 'xtick.labelsize': fsize, 'ytick.labelsize': fsize, 'axes.labelsize': fsize})
+
+    dpi = 80
+    fig, ax = plt.subplots(figsize=(2500 / dpi, 600 / dpi))
+    fig.subplots_adjust(bottom=0.12, left=0.08, right=0.92, top=0.8 if len(args.activities) == 1 else 0.7)
+    avg_label = window_label(args.half_window)
+    dots_label = 'all, each day' if len(args.activities) > 1 else 'each day'
+    ax.plot(xvals, mfos['total'], linewidth=0, marker='.', markersize=13, alpha=0.6, color=total_color, label=dots_label)
+    for igroup, group in enumerate(args.activities):
+        ax.plot(xvals, mfos[(igroup, 'avg')], linewidth=3, alpha=0.8, color=group_colors[igroup], label='%s, %s (%.0f h total)' % (group_label(group), avg_label, sum(mfos[igroup])))
+    if len(args.activities) > 1:
+        ax.plot(xvals, mfos[('total', 'avg')], linewidth=4, alpha=0.8, color=total_color, label='all, %s' % avg_label)
+    if 'long_avgs' in mfos:
+        ax.plot(xvals, mfos['long_avgs'], linewidth=3, alpha=0.6, color=weekly_color, label=window_label(args.weekly_half_window) + (' (exclud. vac.+sick)' if len(vacation_dates) > 0 else ''))
+    if args.target_hrs_per_week is not None:
+        ax.axhline(y=args.target_hrs_per_week / 7, color=weekly_color, linestyle='--', alpha=0.5, linewidth=3)
+
+    if args.ymax is None:
+        ymax = max(mfos['total'] + [1]) * 1.05
+    else:  # same top for every plot, so they can be compared
+        ymax = args.ymax
+        annotate_clipped_days(ax, mfos, ymax, fsize)
+    ax.set_ylim(0, ymax)
+    add_per_week_axes(ax)
+
+    ax.set_xlim(xvals[0] - timedelta(days=2), max(xvals[-1], args.stop_date or xvals[-1]) + timedelta(days=2))  # through --stop-date, so a year in progress is drawn at full-year scale
+    ax.xaxis.set_major_locator(mpl.dates.MonthLocator() if (xvals[-1] - xvals[0]).days < 500 else mpl.dates.MonthLocator(bymonth=range(1, 13, 2)))
+    ax.xaxis.set_major_formatter(mpl.dates.DateFormatter('%b'))
+    ax.grid(axis='y')
+    titlestr = '%d' % xvals[0].year if xvals[0].year == xvals[-1].year else '%s to %s' % (xvals[0].date(), xvals[-1].date())
+    titlestr += '   (%.1f hrs/week avg%s)' % (avg_hrs_per_week, ', exclud. %d vac.+sick days' % len(vacation_dates) if len(vacation_dates) > 0 else '')
+    n_legend_rows = 1 if len(args.activities) == 1 else 3
+    ax.set_title(titlestr, fontweight='bold', pad=10 + 25 * n_legend_rows)
+    ax.legend(loc='lower left', bbox_to_anchor=(0, 1.0), ncol=4 if n_legend_rows == 1 else 3, frameon=False)
+    for s, e in date_spans(vacation_dates):
+        ax.axvspan(s - timedelta(hours=12), e + timedelta(hours=12), alpha=0.15, color='red')
+
+    plt.savefig(args.plotfile)
+    plt.close()
+    print('    wrote %s' % args.plotfile)
+
+# ----------------------------------------------------------------------------------------
+helpstr = """
+Plot daily hours of a set of activities from ~/Dropbox/hill/training/<year>/general.txt, where
+the activity is the first word of each indented line ('  run 1:00 ...') and, for the activities in
+timed_activities, its time is the second word ('1:00', '100' or '1'). Lines for activities in
+optional_time_activities (alpine-climb, scramble) are counted when they have a time and skipped
+when they don't. All of a day's lines for an activity are added together.
+
+Every year from %d on is read and checked on every run. Any line that breaks the format (an
+activity name not in any of the three lists, a missing time, a missing,
+repeated or out-of-order day, a blank line, ...) is an error: all errors are printed, with file
+and line number, and nothing is plotted. Today's lines aren't read, since it's probably not finished.
+
+--activities names one of activity_sets (at the top of this script), which lists its groups of
+activities and its plot settings. Each group gets its own 7-day average line; with more than one
+group there is also a line for all groups together. The dots are each day's hours for all groups
+together. There is one y axis, in hours/day, labeled on both sides in hours/day and in hours/week
+(a hours/day average times 7). Vacation detection (work only) shades stretches of zero-hour days
+red and leaves them out of the hrs/week average and the 31-day average.
+
+The usual runs (one per year, 2021 to now) are in ~/trainplots/run.sh, which writes the plots
+and a .log for each to ~/trainplots/, plus index.html showing all years. See ~/trainplots/README.
 
 examples:
-trainparse --plotfile ~/trainplots/work-all.jpg                                                   # all years
-trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31 --plotfile ~/trainplots/work-2025.jpg  # one year
+trainparse --start-date 2025-jan-1 --stop-date 2025-dec-31 --plotfile ~/trainplots/work-2025.jpg  # work, one year
+trainparse --activities leg --start-date 2025-jan-1 --plotfile leg.jpg
 trainparse --debug --start-date 2021-Apr-15 --half-window 7
-
-Date lines in general.txt must read '<day> <month> ...', e.g. '15 oct o s'; a missing month crashes
-the parse. Today is skipped, since it is probably not finished.
-"""
+""" % first_year
 parser = argparse.ArgumentParser(description=helpstr, formatter_class=argparse.RawDescriptionHelpFormatter)
-# parser.add_argument('--mfile', default='%s/Dropbox/hill/m.csv' % os.getenv('HOME'))
-# parser.add_argument('--plot', action='store_true')
+parser.add_argument('--activities', default='work', choices=sorted(activity_sets), help='which of activity_sets to plot (see above)')
+parser.add_argument('--training-dir', default=os.getenv('HOME') + '/Dropbox/hill/training')
 parser.add_argument('--start-date', help='e.g. 2019-Jun-1 (note that the floating average can\'t see any values before this, i.e. the first few days will be only averaged over values on one side (the right)')
 parser.add_argument('--stop-date', help='see --start-date')
-parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.jpg', help='output jpg file name')
+parser.add_argument('--plotfile', default=os.getenv('HOME') + '/train.jpg', help='output file name (.jpg, .png, .svg)')
 parser.add_argument('--half-window', type=float, default=3.5, help='half width (days) of window for the daily hours average (default 3.5 = the 7-day avg)')
-parser.add_argument('--weekly-half-window', type=float, default=15, help='half width (days) of window for the hrs/week average (default 15 = the 31-day avg)')
-parser.add_argument('--vacation-threshold', type=int, default=3, help='number of zero-hour days in a 7-day window that triggers vacation detection (first 2 zero days in each stretch are treated as normal weekend)')
 parser.add_argument('--debug', action='store_true')
 args = parser.parse_args()
 tutils.process_args(args)
+check_config()
+aset = activity_sets[args.activities]
+args.activities = aset['groups']  # from here on, the list of groups
+args.vacation_threshold, args.target_hrs_per_week, args.ymax = aset['vacation_threshold'], aset['target_hrs_per_week'], aset['ymax']  # hours/week, hours/day
+args.weekly_half_window = timedelta(days=aset['weekly_half_window'])  # 0 turns off the long average
 
-trainfos = []
-for year in range(2021, datetime.now().year+1):
-    trainfos += parse_trfile(year)  # NOTE assumes you have the years sequentially
-# get_time_per_week(trainfos, 'work')
-# get_n_week_time(trainfos, 'work', 3)
-plot_acty('work')
+if args.start_date is not None and args.start_date.year < first_year:
+    raise Exception('can\'t read years before %d' % first_year)
+trainfos, errors = [], []
+for year in range(first_year, datetime.now().year + 1):  # read every year, so every run checks all of them
+    trainfos += parse_trfile(year, errors)
+if len(errors) > 0:
+    raise Exception('%d format error(s) in general.txt files:\n  %s' % (len(errors), '\n  '.join(errors)))
+if args.start_date is None:
+    args.start_date = trainfos[0]['date']
+plot_activities(trainfos)
