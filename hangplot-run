@@ -1,0 +1,47 @@
+#!/bin/bash
+# Plot the two hangboard eras separately: through 2025 I hung off the board with counterweight
+# (weights negative, body weight part of the load), from 2026 I pick weight up off the ground.
+
+outdir="${1:-$HOME/hangplots}"
+training_dir="$HOME/Dropbox/hill/training"
+
+hanging_years="2019:2020:2022:2023:2024:2025"
+lifting_years="2026"
+
+hangplot --years "$hanging_years" --plotdir "$outdir/hanging"
+
+# skip years with no workouts yet (a file with only a config and a 'next:' block)
+lifting_with_data=""
+for y in ${lifting_years//:/ }; do
+    if grep -q '^>' "$training_dir/$y/hangboard.txt" 2>/dev/null; then
+        lifting_with_data="${lifting_with_data:+$lifting_with_data:}$y"
+    fi
+done
+if [ -n "$lifting_with_data" ]; then
+    hangplot --years "$lifting_with_data" --plotdir "$outdir/lifting"
+else
+    echo "  no workouts yet in $lifting_years, skipping lifting plots"
+fi
+
+# generate html viewer
+cat > "$outdir/index.html" <<'HTMLEOF'
+<html>
+<head><title>hangplots</title></head>
+<body style="margin: 0; padding: 20px; background: #fff; text-align: center;">
+HTMLEOF
+
+for era in lifting hanging; do
+    if [ -d "$outdir/$era" ]; then
+        echo "<h1>$era</h1>" >> "$outdir/index.html"
+        for f in "$outdir/$era"/*.svg; do
+            echo "<div><img src=\"$era/$(basename "$f")\" style=\"max-width: 100%;\"></div>" >> "$outdir/index.html"
+        done
+    fi
+done
+
+cat >> "$outdir/index.html" <<'HTMLEOF'
+</body>
+</html>
+HTMLEOF
+
+echo "wrote $outdir/index.html"
